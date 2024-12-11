@@ -1,0 +1,22 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Classe : {{ class_instance.name }}</h2>
+  <a href="{{ url_for('update_class', class_id=class_instance.id) }}" class="btn btn-secondary">Modifier la Classe</a>
+  <a href="{{ url_for('new_students', class_id=class_instance.id) }}" class="btn btn-primary">Ajouter un Élève</a>
+  <h3 class="mt-4">Liste des Élèves</h3>
+  {% if students %}
+    <ul class="list-group">
+      {% for student in students %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ student.name }}
+          <form action="{{ url_for('delete_student', student_id=student.id) }}" method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet élève ?');">
+            <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+
+  {% else %}
+    <p>Il n'y a pas encore d'élèves dans cette classe.</p>
+  {% endif %}
+{% endblock %}

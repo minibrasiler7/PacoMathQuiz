@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Résultats de la Compétition : {{ competition.group.name }}</h2>
+  <p>Date de démarrage : {{ competition.date_started.strftime('%d/%m/%Y %H:%M') }}</p>
+  <p>Classe : {{ competition.class_.name }}</p>
+  <p>Mode : {{ 'Mode manuel' if competition.mode == 'manuel' else 'Mode automatique' }}</p>
+
+  <hr>
+
+  <h3>Classement des Élèves par Réponses Justes :</h3>
+
+    <ul class="list-group mb-4">
+      {% for student in active_students %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ loop.index }}. {{ student.name }}
+          <span class="badge bg-success rounded-pill">{{ stats_dict[student.id] }}</span>
+        </li>
+      {% endfor %}
+      {% for student in eliminated_students %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ loop.index }}. {{ student.name }}
+          <span class="badge bg-success rounded-pill">{{ stats_dict[student.id] }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+
+{% endblock %}

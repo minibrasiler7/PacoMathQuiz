@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Compétition : {{ competition.group.name }}</h2>
+  <p>En attente de votre tour...</p>
+{% endblock %}
+
+{% block scripts %}
+<script>
+setInterval(function() {
+    fetch("{{ url_for('competition_status', competition_id=competition.id) }}")
+      .then(response => response.json())
+      .then(data => {
+          const activeStudentIds = data.active_student_ids;
+          const competitionStarted = data.competition_started; // Récupérer l'état du démarrage
+
+          if (!competitionStarted) {
+              // La compétition n'a pas commencé, on ne fait rien de spécial, juste on attend
+              console.log("La compétition n'a pas encore commencé, on attend...");
+              return;
+          }
+
+          // Si on est ici, c'est que la compétition a démarré
+          // Si aucun élève actif, rediriger vers les résultats
+          if (activeStudentIds.length === 0) {
+              window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
+              return;
+          }
+
+          // Vérifier si c'est le tour de cet élève
+          if (data.current_student_id == {{ student_id }}) {
+              console.log("C'est le tour de cet élève, redirection vers run_competition");
+              window.location.href = "{{ url_for('run_competition', competition_id=competition.id) }}";
+          } else {
+              console.log("Ce n'est pas le tour de cet élève, on continue d'attendre");
+          }
+      })
+      .catch(error => console.error("Erreur lors du fetch du status:", error));
+}, 2000);
+</script>
+{% endblock %}
+
+

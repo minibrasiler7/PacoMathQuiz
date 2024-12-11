@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Compétition : {{ competition.group.name }}</h2>
+  <p>Date de démarrage : {{ competition.date_started.strftime('%d/%m/%Y %H:%M') }}</p>
+  <p>Classe : {{ competition.class_.name }}</p>
+  <p>Mode : {{ 'Mode manuel' if competition.mode == 'manuel' else 'Mode automatique' }}</p>
+
+  {% if competition.mode == 'automatique' %}
+    <h3>Code de Connexion : <strong>{{ competition.code }}</strong></h3>
+    <p>Les élèves peuvent se connecter en utilisant ce code.</p>
+
+    <h4>Élèves qui ont rejoint :</h4>
+    <ul>
+      {% for student in competition.participants %}
+        <li>{{ student.name }}</li>
+      {% endfor %}
+    </ul>
+
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  {% else %}
+    <!-- Mode Manuel : Valider les élèves présents -->
+    <h4>Valider les élèves présents :</h4>
+    <form method="POST">
+      {{ form.hidden_tag() }}
+      <div class="row">
+        {% for student in students %}
+          <div class="col-md-4">
+            <div class="card mb-3" id="student-card-{{ student.id }}" data-student-id="{{ student.id }}" style="border: 2px solid red; cursor: pointer;">
+              <div class="card-body">
+                <h5 class="card-title">{{ student.name }}</h5>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      {{ form.submit(class="btn btn-primary") }}
+    </form>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    {% if competition.mode == 'manuel' %}
+      var selectedStudents = {};
+      var studentCards = document.querySelectorAll('.card[data-student-id]');
+      studentCards.forEach(function(card) {
+        card.addEventListener('click', function() {
+          var studentId = this.getAttribute('data-student-id');
+          if (selectedStudents[studentId]) {
+            // Désélectionner l'élève
+            delete selectedStudents[studentId];
+            this.style.borderColor = 'red';
+            // Retirer l'input caché
+            var input = document.querySelector('input[name="student_ids"][value="' + studentId + '"]');
+            if (input) {
+              input.parentNode.removeChild(input);
+            }
+          } else {
+            // Sélectionner l'élève
+            selectedStudents[studentId] = true;
+            this.style.borderColor = 'green';
+            // Ajouter un input caché au formulaire
+            var form = document.querySelector('form');
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'student_ids';
+            input.value = studentId;
+            form.appendChild(input);
+          }
+        });
+      });
+    {% endif %}
+  });
+</script>
+{% endblock %}

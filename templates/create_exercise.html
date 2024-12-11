@@ -1,0 +1,252 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>{{ title }}</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <!-- Afficher les erreurs globales -->
+    {% if form.errors %}
+      <div class="alert alert-danger">
+        <ul>
+          {% for field_errors in form.errors.values() %}
+            {% for error in field_errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <!-- Titre de l'exercice -->
+    <div class="form-group">
+      {{ form.title.label(class="form-label") }}
+      {{ form.title(class="form-control") }}
+      {% for error in form.title.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <!-- Question -->
+    <div class="form-group">
+      {{ form.question.label(class="form-label") }}
+      {{ form.question(class="form-control") }}
+      {% for error in form.question.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <!-- Type d'exercice -->
+    <div class="form-group">
+      {{ form.exercise_type.label(class="form-label") }}
+      {{ form.exercise_type(class="form-control", id="exercise_type") }}
+      {% for error in form.exercise_type.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <!-- Section pour les QCM -->
+    <div id="qcm-section" style="display: none;">
+      <h4>Choix du QCM</h4>
+      <div id="choices-container">
+        {% for choice_form in form.choices %}
+          <div class="choice-entry">
+            <div class="form-group">
+              {{ choice_form.text.label(class="form-label") }}
+              {{ choice_form.text(class="form-control") }}
+              {% for error in choice_form.text.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="form-group form-check">
+              {{ choice_form.is_correct(class="form-check-input") }}
+              {{ choice_form.is_correct.label(class="form-check-label") }}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-choice" class="btn btn-secondary">Ajouter un choix</button>
+      <button type="button" id="remove-choice" class="btn btn-danger" style="display: none;">Supprimer le dernier choix</button>
+      <!-- Afficher les erreurs liées aux choix -->
+      {% for error in form.choices.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <!-- Section pour Vrai/Faux -->
+    <div id="vrai-faux-section" style="display: none;">
+      <h4>Réponse Correcte</h4>
+      <div class="form-group">
+        {% for subfield in form.vrai_faux_answer %}
+          <div class="form-check">
+            {{ subfield(class="form-check-input") }}
+            {{ subfield.label(class="form-check-label") }}
+          </div>
+        {% endfor %}
+        {% for error in form.vrai_faux_answer.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    <!-- Section pour Réponse Courte -->
+    <div id="reponse-courte-section" style="display: none;">
+      <h4>Réponses Correctes</h4>
+      <div id="answers-container">
+        {% for answer in form.correct_answers %}
+          <div class="answer-entry">
+            <div class="form-group">
+              {{ answer.label(class="form-label") }}
+              {{ answer(class="form-control") }}
+              {% for error in answer.errors %}
+                <div class="text-danger">{{ error }}</div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+      <button type="button" id="add-answer" class="btn btn-secondary">Ajouter une réponse</button>
+      {% for error in form.correct_answers.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <!-- Bouton de soumission -->
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+
+  <!-- Template pour les nouveaux choix -->
+  <div id="choice-template" style="display: none;">
+    <div class="choice-entry">
+      <div class="form-group">
+        <label class="form-label" for="choices-__prefix__-text">Choix</label>
+        <input class="form-control" id="choices-__prefix__-text" name="choices-__prefix__-text" type="text">
+      </div>
+      <div class="form-group form-check">
+        <input class="form-check-input" id="choices-__prefix__-is_correct" name="choices-__prefix__-is_correct" type="checkbox">
+        <label class="form-check-label" for="choices-__prefix__-is_correct">Correct</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template pour les nouvelles réponses -->
+  <div id="answer-template" style="display: none;">
+    <div class="answer-entry">
+      <div class="form-group">
+        <label class="form-label" for="correct_answers-__prefix__">Réponse Correcte</label>
+        <input class="form-control" id="correct_answers-__prefix__" name="correct_answers-__prefix__" type="text">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      function toggleSections() {
+        var exerciseType = document.getElementById('exercise_type').value;
+        var qcmSection = document.getElementById('qcm-section');
+        var vraiFauxSection = document.getElementById('vrai-faux-section');
+        var reponseCourteSection = document.getElementById('reponse-courte-section');
+
+        if (exerciseType === 'qcm') {
+          qcmSection.style.display = 'block';
+          vraiFauxSection.style.display = 'none';
+          reponseCourteSection.style.display = 'none';
+
+          // Activer les champs QCM et désactiver les autres
+          enableFields(qcmSection);
+          disableFields(vraiFauxSection);
+          disableFields(reponseCourteSection);
+
+        } else if (exerciseType === 'vrai_faux') {
+          qcmSection.style.display = 'none';
+          vraiFauxSection.style.display = 'block';
+          reponseCourteSection.style.display = 'none';
+
+          // Activer les champs Vrai/Faux et désactiver les autres
+          enableFields(vraiFauxSection);
+          disableFields(qcmSection);
+          disableFields(reponseCourteSection);
+
+        } else if (exerciseType === 'reponse_courte') {
+          qcmSection.style.display = 'none';
+          vraiFauxSection.style.display = 'none';
+          reponseCourteSection.style.display = 'block';
+
+          // Activer les champs Réponse Courte et désactiver les autres
+          enableFields(reponseCourteSection);
+          disableFields(qcmSection);
+          disableFields(vraiFauxSection);
+        }
+      }
+
+      function disableFields(section) {
+        var inputs = section.querySelectorAll('input, select, textarea, button');
+        inputs.forEach(function(input) {
+          input.disabled = true;
+        });
+      }
+
+      function enableFields(section) {
+        var inputs = section.querySelectorAll('input, select, textarea, button');
+        inputs.forEach(function(input) {
+          input.disabled = false;
+        });
+      }
+
+      // Gestion des choix pour QCM
+      var addChoiceButton = document.getElementById('add-choice');
+      var removeChoiceButton = document.getElementById('remove-choice');
+      var choicesContainer = document.getElementById('choices-container');
+      var choiceTemplate = document.getElementById('choice-template').innerHTML;
+      var choiceIndex = {{ form.choices|length }};
+
+      function updateChoiceButtons() {
+        if (choiceIndex >= 4) {
+          addChoiceButton.style.display = 'none';
+        } else {
+          addChoiceButton.style.display = '';
+        }
+
+        if (choiceIndex > 2) {
+          removeChoiceButton.style.display = '';
+        } else {
+          removeChoiceButton.style.display = 'none';
+        }
+      }
+
+      addChoiceButton.addEventListener('click', function() {
+        if (choiceIndex < 4) {
+          var newEntryHtml = choiceTemplate.replace(/__prefix__/g, choiceIndex);
+          choicesContainer.insertAdjacentHTML('beforeend', newEntryHtml);
+
+          choiceIndex++;
+          updateChoiceButtons();
+        }
+      });
+
+      removeChoiceButton.addEventListener('click', function() {
+        if (choiceIndex > 2) {
+          var lastChoice = choicesContainer.querySelector('.choice-entry:last-child');
+          if (lastChoice) {
+            choicesContainer.removeChild(lastChoice);
+            choiceIndex--;
+            updateChoiceButtons();
+          }
+        }
+      });
+
+      // Gestion des réponses pour Réponse Courte
+      var addAnswerButton = document.getElementById('add-answer');
+      var answersContainer = document.getElementById('answers-container');
+      var answerTemplate = document.getElementById('answer-template').innerHTML;
+      var answerIndex = {{ form.correct_answers|length }};
+
+      addAnswerButton.addEventListener('click', function() {
+        if (answerIndex < 5) {
+          var newEntryHtml = answerTemplate.replace(/__prefix__/g, answerIndex);
+          answersContainer.insertAdjacentHTML('beforeend', newEntryHtml);
+
+          answerIndex++;
+        } else {
+          alert('Vous ne pouvez pas ajouter plus de 5 réponses.');
+        }
+      });
+
+      // Initialisation
+      document.getElementById('exercise_type').addEventListener('change', toggleSections);
+      toggleSections(); // Appeler lors du chargement initial
+      updateChoiceButtons(); // Mettre à jour l'affichage des boutons de choix
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2>Compétition : {{ competition.group.name }}</h2>
+<h3>C'est votre tour, {{ student.name }} !</h3>
+<h4>Question :</h4>
+<p>{{ exercise.question }}</p>
+
+<!-- Formulaire pour répondre à la question -->
+<form method="POST">
+  {% if exercise.exercise_type == 'qcm' %}
+    {% for choice in exercise.choices %}
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="answer" id="choice{{ choice.id }}" value="{{ choice.id }}" required>
+        <label class="form-check-label" for="choice{{ choice.id }}">{{ choice.text }}</label>
+      </div>
+    {% endfor %}
+  {% elif exercise.exercise_type == 'vrai_faux' %}
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="answer" id="true" value="Vrai" required>
+      <label class="form-check-label" for="true">Vrai</label>
+    </div>
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="answer" id="false" value="Faux" required>
+      <label class="form-check-label" for="false">Faux</label>
+    </div>
+  {% elif exercise.exercise_type == 'reponse_courte' %}
+    <div class="form-group">
+      <input type="text" name="answer" class="form-control" placeholder="Votre réponse" required>
+    </div>
+  {% endif %}
+  <input type="hidden" name="exercise_id" value="{{ exercise.id }}">
+  <button type="submit" class="btn btn-primary">Envoyer</button>
+</form>
+
+<div id="timer-container" style="margin-top:20px;">
+  <span id="hourglass" style="font-size:2rem;">⏳</span>
+  <span>Il vous reste <span id="time-remaining">10</span> secondes pour répondre.</span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let timeRemaining = 10; // durée en secondes
+  const timeDisplay = document.getElementById('time-remaining');
+
+  const intervalId = setInterval(() => {
+    timeRemaining--;
+    timeDisplay.textContent = timeRemaining;
+
+    if (timeRemaining <= 0) {
+      clearInterval(intervalId);
+      // Quand le temps est écoulé, on peut soumettre automatiquement le formulaire
+      // ou afficher un message, par exemple :
+
+      // Soumission automatique du formulaire
+      document.querySelector('form').submit();
+    }
+  }, 1000);
+</script>
+{% endblock %}
+

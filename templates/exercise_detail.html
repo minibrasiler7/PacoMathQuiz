@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>{{ exercise.title }}</h2>
+  <p><strong>Type :</strong> {{ exercise.exercise_type|capitalize }}</p>
+  <p><strong>Question :</strong> {{ exercise.question }}</p>
+
+  {% if exercise.exercise_type == 'qcm' %}
+    <h4>Choix :</h4>
+    <ul>
+      {% for choice in exercise.choices %}
+        <li>
+          {{ choice.text }} {% if choice.is_correct %}(Correct){% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p><strong>Réponse Correcte :</strong> {{ exercise.correct_answer }}</p>
+  {% endif %}
+{% endblock %}

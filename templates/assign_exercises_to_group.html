@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Assigner des Exercices au Groupe : {{ group.name }}</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+      {% for exercise in exercises %}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="exercise_ids" value="{{ exercise.id }}"
+            {% if exercise in group.exercises %}checked{% endif %}>
+          <label class="form-check-label">{{ exercise.title }}</label>
+        </div>
+      {% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock %}
+

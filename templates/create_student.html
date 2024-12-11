@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+{% block title %}Nouvel Élève{% endblock %}
+{% block content %}
+    <h2>Ajouter des Élèves à la Classe "{{ class_instance.name }}"</h2>
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        <div id="students-list">
+           {% for student_form in form.students.entries %}
+                <div class="form-group student-entry">
+
+                </div>
+
+            {% endfor %}
+
+        </div>
+        <button type="button" id="add-student" class="btn btn-secondary mb-3">Ajouter un Élève</button>
+        <div>
+            {{ form.submit(class="btn btn-primary") }}
+        </div>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function(){
+            $('#add-student').click(function(){
+                var index = $('#students-list .form-group').length;
+                if(index < {{ form.students.max_entries }}){
+                    var newInput = `
+                        <div class="form-group student-entry">
+                            <label for="students-` + index + `-name">Nom de l'élève</label>
+                            <input class="form-control" id="students-` + index + `-name" name="students-` + index + `-name" type="text" required>
+                            <button type="button" class="btn btn-danger btn-sm remove-student">Supprimer</button>
+                        </div>
+                    `;
+                    $('#students-list').append(newInput);
+                } else {
+                    alert('Vous avez atteint le nombre maximum d\'élèves.');
+                }
+            });
+
+            // Supprimer un champ de saisie d'élève
+            $(document).on('click', '.remove-student', function(){
+                $(this).closest('.student-entry').remove();
+            });
+        });
+    </script>
+{% endblock %}

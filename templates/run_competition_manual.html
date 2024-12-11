@@ -1,0 +1,48 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Compétition : {{ competition.group.name }}</h2>
+  <h3>Élève actuel : {{ student.name }}</h3>
+  <h4>Question :</h4>
+  <p>{{ exercise.question }}</p>
+
+  <!-- Afficher les détails de la question selon le type -->
+  {% if exercise.exercise_type == 'qcm' %}
+    <ul>
+      {% for choice in exercise.choices %}
+        <li>{{ choice.text }}</li>
+      {% endfor %}
+    </ul>
+  {% elif exercise.exercise_type == 'vrai_faux' %}
+    <p>{{ exercise.correct_answer }}</p>
+  {% elif exercise.exercise_type == 'reponse_courte' %}
+    <p>{{ exercise.correct_answer }}</p>
+  {% endif %}
+
+  <!-- Boutons pour valider ou invalider la réponse -->
+  <form method="POST">
+    <button name="result" value="correct" class="btn btn-success">Correct</button>
+    <button name="result" value="incorrect" class="btn btn-danger">Incorrect</button>
+  </form>
+
+  <!-- Afficher les élèves encore en jeu -->
+  <h4>Élèves encore en jeu :</h4>
+  <ul>
+    {% for student_id, name in students_dict.items() %}
+      <li style="color: {% if student_id in active_student_ids %}green{% else %}gray{% endif %};">
+        {{ name }}
+      </li>
+    {% endfor %}
+  </ul>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  setTimeout(function() {
+    // Cliquer automatiquement sur "incorrect" après 12 secondes
+    var btn = document.querySelector('button[name="result"][value="incorrect"]');
+    if(btn) {
+      btn.click();
+    }
+  }, 12000); // 12 000 millisecondes
+</script>
+{% endblock %}

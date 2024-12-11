@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Groupes d'Exercices</h2>
+  <a href="{{ url_for('new_exercise_group') }}" class="btn btn-primary">Créer un Nouveau Groupe</a>
+  <ul class="list-group mt-4">
+    {% for group in groups %}
+      <li class="list-group-item">
+        <a href="{{ url_for('exercise_group_detail', group_id=group.id) }}">{{ group.name }}</a>
+        <form action="{{ url_for('delete_exercise_group', group_id=group.id) }}" method="POST" style="display: inline;">
+          {{ form.hidden_tag() }}
+          <button type="submit" class="btn btn-danger btn-sm float-right" onclick="return confirm('Êtes-vous sûr de vouloir supprimer ce groupe ?');">Supprimer</button>
+        </form>
+      </li>
+    {% else %}
+      <li class="list-group-item">Aucun groupe d'exercices trouvé.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

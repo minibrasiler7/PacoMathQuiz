@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Rejoindre une Compétition</h2>
+  <form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+      {{ form.code.label(class="form-label") }}
+      {{ form.code(class="form-control") }}
+      {% for error in form.code.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>{{ title }}</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+      {{ form.name.label(class="form-label") }}
+      {{ form.name(class="form-control") }}
+      {% for error in form.name.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock %}

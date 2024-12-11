@@ -1,0 +1,58 @@
+{% extends "layout.html" %}
+{% block content %}
+<h1 class="my-4">Compétition en cours!!!</h1>
+
+{% if current_student %}
+  <h3>Élève en train de répondre : {{ current_student.name }}</h3>
+{% else %}
+  <h3>Aucun élève en train de répondre</h3>
+{% endif %}
+
+{% if current_exercise %}
+  <h4>Question actuelle :</h4>
+  <p>{{ current_exercise.question }}</p>
+{% else %}
+  <p>Aucune question n'est actuellement sélectionnée.</p>
+{% endif %}
+
+<hr>
+<h4>Participants :</h4>
+<div class="row">
+  {% for stud in participants %}
+    {% set stat = stud.competition_stats.filter_by(competition_id=competition.id).first() %}
+    <div class="col-md-3 mb-3">
+      <div class="card" style="border: 2px solid {% if stud.id in active_student_ids %}green{% else %}red{% endif %};">
+        <div class="card-body">
+          <h5 class="card-title">{{ stud.name }}</h5>
+          <p class="card-text">Réponses Justes : {{ stat.correct_answers if stat else 0 }}</p>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Stocker les valeurs actuelles pour détecter un changement
+  let lastStudentId = {{ current_student.id if current_student else 'null' }};
+  let lastExerciseId = {{ current_exercise.id if current_exercise else 'null' }};
+
+  setInterval(function() {
+    fetch("{{ url_for('teacher_status', competition_id=competition.id) }}")
+      .then(response => response.json())
+      .then(data => {
+        // Compare les valeurs reçues avec lastStudentId et lastExerciseId
+        const currentStudentId = data.current_student_id;
+        const currentExerciseId = data.current_exercise_id;
+
+        // Si l'élève courant a changé ou l'exercice courant a changé, on recharge
+        if ((currentStudentId !== lastStudentId) || (currentExerciseId !== lastExerciseId)) {
+          location.reload();
+        }
+      })
+      .catch(error => console.error("Erreur lors du fetch teacher_status:", error));
+  }, 3000); // Interroge le serveur toutes les 3 secondes
+</script>
+{% endblock %}

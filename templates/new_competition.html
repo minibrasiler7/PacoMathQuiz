@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Démarrer une Nouvelle Compétition</h2>
+  <form method="POST" action="">
+    {{ form.hidden_tag() }}
+    <div class="form-group">
+      {{ form.group_id.label(class="form-label") }}
+      {{ form.group_id(class="form-control") }}
+      {% for error in form.group_id.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <div class="form-group">
+      {{ form.class_id.label(class="form-label") }}
+      {{ form.class_id(class="form-control") }}
+      {% for error in form.class_id.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    <div class="form-group">
+      {{ form.mode.label(class="form-label") }}
+      {% for subfield in form.mode %}
+        <div class="form-check">
+          {{ subfield(class="form-check-input") }}
+          {{ subfield.label(class="form-check-label") }}
+        </div>
+      {% endfor %}
+      {% for error in form.mode.errors %}
+        <div class="text-danger">{{ error }}</div>
+      {% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary") }}
+  </form>
+{% endblock %}

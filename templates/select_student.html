@@ -1,0 +1,15 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Sélectionnez Votre Nom</h2>
+  <form method="POST">
+    <div class="form-group">
+      <label for="studentSelect">Votre Nom :</label>
+      <select class="form-control" id="studentSelect" name="student_id">
+        {% for student in students %}
+          <option value="{{ student.id }}">{{ student.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Rejoindre la Compétition</button>
+  </form>
+{% endblock %}

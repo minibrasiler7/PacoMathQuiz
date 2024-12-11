@@ -1,0 +1,14 @@
+{% extends "layout.html" %}
+{% block content %}
+  <h2>{{ group.name }}</h2>
+  <a href="{{ url_for('update_exercise_group', group_id=group.id) }}" class="btn btn-secondary">Modifier le Groupe</a>
+  <a href="{{ url_for('assign_exercises_to_group', group_id=group.id) }}" class="btn btn-primary">Assigner des Exercices</a>
+  <h3 class="mt-4">Exercices dans ce Groupe</h3>
+  <ul class="list-group">
+    {% for exercise in group.exercises %}
+      <li class="list-group-item">{{ exercise.title }}</li>
+    {% else %}
+      <li class="list-group-item">Aucun exercice dans ce groupe.</li>
+    {% endfor %}
+  </ul>
+{% endblock %}

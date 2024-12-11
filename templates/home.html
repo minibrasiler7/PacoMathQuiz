@@ -1,0 +1,20 @@
+{% extends "layout.html" %}
+{% block title %}Accueil{% endblock %}
+{% block content %}
+    <div class="jumbotron mt-4">
+        <div class="row">
+            <div class="col-md-6">
+                <h1 class="display-4">Bienvenue sur PacoMathQuiz!</h1>
+                <p class="lead">Votre plateforme éducative pour des quiz de mathématiques amusants et interactifs.</p>
+                <hr class="my-4">
+                <div class="d-flex flex-wrap">
+                    <a href="{{ url_for('new_competition') }}" class="btn btn-orange btn-lg mr-2 mb-2">Démarrer une Compétition</a>
+                    <a href="{{ url_for('join_competition') }}" class="btn btn-orange btn-lg mb-2">Rejoindre une Compétition</a>
+                </div>
+            </div>
+            <div class="col-md-6 text-center">
+                <img src="{{ url_for('static', filename='images/paco.png') }}" alt="Paco Mascotte" class="img-fluid rounded-circle paco-image" style="max-width: 300px;">
+            </div>
+        </div>
+    </div>
+{% endblock %}
