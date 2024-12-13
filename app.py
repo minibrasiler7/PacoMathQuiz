@@ -1,14 +1,17 @@
 # app.py
 from datetime import datetime
-
+import os
 from flask import Flask
+from dotenv import load_dotenv
 from extensions import db, login_manager
 from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 
+
+load_dotenv()
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'votre_cle_secrete'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialiser les extensions
