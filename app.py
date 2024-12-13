@@ -3,14 +3,17 @@ from datetime import datetime
 
 from flask import Flask
 from extensions import db, login_manager
+from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'votre_cle_secrete'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialiser les extensions
 db.init_app(app)
+migrate = Migrate(app, db)
 login_manager.init_app(app)
 bcrypt = Bcrypt(app)
 
