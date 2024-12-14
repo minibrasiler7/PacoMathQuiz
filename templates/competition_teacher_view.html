@@ -1,58 +1,103 @@
+{# competition_teacher_view.html #}
 {% extends "layout.html" %}
 {% block content %}
-<h1 class="my-4">Compétition en cours!!!</h1>
+<h2>Compétition : {{ competition.group.name }}</h2>
+<h3>C'est votre tour, {{ current_student.name }} !</h3>
+<h4>Question :</h4>
+<p>{{ current_exercise.question }}</p>
 
-{% if current_student %}
-  <h3>Élève en train de répondre : {{ current_student.name }}</h3>
-{% else %}
-  <h3>Aucun élève en train de répondre</h3>
-{% endif %}
-
-{% if current_exercise %}
-  <h4>Question actuelle :</h4>
-  <p>{{ current_exercise.question }}</p>
-{% else %}
-  <p>Aucune question n'est actuellement sélectionnée.</p>
-{% endif %}
-
-<hr>
-<h4>Participants :</h4>
-<div class="row">
-  {% for stud in participants %}
-    {% set stat = stud.competition_stats.filter_by(competition_id=competition.id).first() %}
-    <div class="col-md-3 mb-3">
-      <div class="card" style="border: 2px solid {% if stud.id in active_student_ids %}green{% else %}red{% endif %};">
-        <div class="card-body">
-          <h5 class="card-title">{{ stud.name }}</h5>
-          <p class="card-text">Réponses Justes : {{ stat.correct_answers if stat else 0 }}</p>
-        </div>
+<!-- Formulaire pour répondre à la question -->
+<form method="POST" id="answer-form">
+  {% if current_exercise.exercise_type == 'qcm' %}
+    {% for choice in current_exercise.choices %}
+      <div class="form-check">
+        <input class="form-check-input" type="radio" name="answer" id="choice{{ choice.id }}" value="{{ choice.id }}" required>
+        <label class="form-check-label" for="choice{{ choice.id }}">{{ choice.text }}</label>
       </div>
+    {% endfor %}
+  {% elif current_exercise.exercise_type == 'vrai_faux' %}
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="answer" id="true" value="Vrai" required>
+      <label class="form-check-label" for="true">Vrai</label>
     </div>
-  {% endfor %}
-</div>
+    <div class="form-check">
+      <input class="form-check-input" type="radio" name="answer" id="false" value="Faux" required>
+      <label class="form-check-label" for="false">Faux</label>
+    </div>
+  {% elif current_exercise.exercise_type == 'reponse_courte' %}
+    <div class="form-group">
+      <input type="text" name="answer" class="form-control" placeholder="Votre réponse" required>
+    </div>
+  {% endif %}
 
+  <button type="submit" class="btn btn-primary">Envoyer</button>
+</form>
+
+<div id="timer-container" style="margin-top:20px;">
+  <span id="hourglass" style="font-size:2rem;">⏳</span>
+  <span>Il vous reste <span id="time-remaining">10</span> secondes pour répondre.</span>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script>
-  // Stocker les valeurs actuelles pour détecter un changement
-  let lastStudentId = {{ current_student.id if current_student else 'null' }};
-  let lastExerciseId = {{ current_exercise.id if current_exercise else 'null' }};
+<script src="https://cdn.socket.io/4.5.1/socket.io.min.js" crossorigin="anonymous"></script>
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", () => {
+    var socket = io();
 
-  setInterval(function() {
-    fetch("{{ url_for('teacher_status', competition_id=competition.id) }}")
-      .then(response => response.json())
-      .then(data => {
-        // Compare les valeurs reçues avec lastStudentId et lastExerciseId
-        const currentStudentId = data.current_student_id;
-        const currentExerciseId = data.current_exercise_id;
+    // Rejoindre une salle spécifique pour la compétition
+    socket.emit('join_competition', {'competition_id': {{ competition.id }} });
 
-        // Si l'élève courant a changé ou l'exercice courant a changé, on recharge
-        if ((currentStudentId !== lastStudentId) || (currentExerciseId !== lastExerciseId)) {
-          location.reload();
-        }
-      })
-      .catch(error => console.error("Erreur lors du fetch teacher_status:", error));
-  }, 3000); // Interroge le serveur toutes les 3 secondes
+    // Gérer le compte à rebours
+    let timeRemaining = 10; // durée en secondes
+    const timeDisplay = document.getElementById('time-remaining');
+    const intervalId = setInterval(() => {
+      timeRemaining--;
+      timeDisplay.textContent = timeRemaining;
+
+      if (timeRemaining <= 0) {
+        clearInterval(intervalId);
+        // Soumettre automatiquement le formulaire
+        document.getElementById('answer-form').submit();
+      }
+    }, 1000);
+
+    // Écouter l'événement 'competition_update' pour ajuster le compte à rebours si nécessaire
+    socket.on('competition_update', (data) => {
+      console.log('Competition Update:', data);
+
+      if (data.current_exercise_question) {
+        // Mettre à jour la question affichée
+        const questionElement = document.querySelector('p');
+        questionElement.textContent = data.current_exercise_question;
+        console.log('Question mise à jour:', data.current_exercise_question);
+      }
+
+      if (data.time_remaining !== undefined) {
+        timeRemaining = data.time_remaining;
+        timeDisplay.textContent = timeRemaining;
+        console.log('Temps restant mis à jour:', timeRemaining);
+
+        // Réinitialiser le timer
+        clearInterval(intervalId);
+        const newIntervalId = setInterval(() => {
+          timeRemaining--;
+          timeDisplay.textContent = timeRemaining;
+
+          if (timeRemaining <= 0) {
+            clearInterval(newIntervalId);
+            // Soumettre automatiquement le formulaire
+            document.getElementById('answer-form').submit();
+          }
+        }, 1000);
+      }
+    });
+
+    // Optionnel : Écouter des événements spécifiques
+    socket.on('time_extended', (data) => {
+      timeRemaining += data.additional_time;
+      console.log(`Temps additionnel ajouté: ${data.additional_time} secondes`);
+    });
+  });
 </script>
 {% endblock %}

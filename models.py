@@ -1,9 +1,10 @@
 # models.py
 
-from datetime import datetime  # Ajoutez cette ligne en haut du fichier
+from datetime import datetime
 from extensions import db, login_manager
 from flask_login import UserMixin
 from sqlalchemy import Text
+import json
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -37,9 +38,11 @@ class Student(db.Model):
     name = db.Column(db.String(150), nullable=False)
     class_id = db.Column(db.Integer, db.ForeignKey('class.id'), nullable=False)
 
+    # Ajoutez la relation manquante ici
+    competition_stats = db.relationship('CompetitionStudentStat', back_populates='student', cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"Student('{self.name}', Class ID={self.class_id})"
-
 
 class Exercise(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -79,7 +82,6 @@ group_exercises = db.Table('group_exercises',
     db.Column('exercise_id', db.Integer, db.ForeignKey('exercise.id'), primary_key=True)
 )
 
-
 competition_participants = db.Table('competition_participants',
     db.Column('competition_id', db.Integer, db.ForeignKey('competition.id'), primary_key=True),
     db.Column('student_id', db.Integer, db.ForeignKey('student.id'), primary_key=True)
@@ -93,7 +95,7 @@ class Competition(db.Model):
     mode = db.Column(db.String(20), nullable=False)  # 'manuel' ou 'automatique'
     code = db.Column(db.Integer, nullable=True)  # Code pour le mode 'automatique'
     competition_started = db.Column(db.Boolean, default=False)
-    current_exercise_id = db.Column(db.Integer, nullable=True)
+    current_exercise_id = db.Column(db.Integer, db.ForeignKey('exercise.id'), nullable=True)
 
     # Nouveaux champs
     current_student_index = db.Column(db.Integer, default=0)
@@ -103,6 +105,25 @@ class Competition(db.Model):
     group = db.relationship('ExerciseGroup', backref='competitions')
     class_ = db.relationship('Class', backref='competitions')
     participants = db.relationship('Student', secondary=competition_participants, backref='competitions')
+    student_stats = db.relationship('CompetitionStudentStat', back_populates='competition', cascade="all, delete-orphan")
+    current_exercise = db.relationship('Exercise', backref='current_competition', lazy=True)
+
+    def get_active_student_ids(self):
+        """Retourne une liste des IDs des étudiants actuellement actifs dans la compétition."""
+        if self.active_student_ids:
+            try:
+                return json.loads(self.active_student_ids)
+            except json.JSONDecodeError:
+                print(f"Erreur de décodage JSON pour active_student_ids: {self.active_student_ids}")
+                return []
+        return []
+
+    def get_current_student_id(self):
+        """Retourne l'ID de l'étudiant dont c'est le tour."""
+        active_student_ids = self.get_active_student_ids()
+        if active_student_ids and 0 <= self.current_student_index < len(active_student_ids):
+            return active_student_ids[self.current_student_index]
+        return None
 
     def __repr__(self):
         return f"Competition('{self.group.name}', Mode: '{self.mode}')"
@@ -113,10 +134,8 @@ class CompetitionStudentStat(db.Model):
     student_id = db.Column(db.Integer, db.ForeignKey('student.id'), primary_key=True)
     correct_answers = db.Column(db.Integer, default=0, nullable=False)
 
-    competition = db.relationship('Competition', backref=db.backref('student_stats', lazy='dynamic'))
-    student = db.relationship('Student', backref=db.backref('competition_stats', lazy='dynamic'))
+    competition = db.relationship('Competition', back_populates='student_stats')
+    student = db.relationship('Student', back_populates='competition_stats')
 
     def __repr__(self):
         return f"CompetitionStudentStat(Competition ID={self.competition_id}, Student ID={self.student_id}, Correct Answers={self.correct_answers})"
-
-

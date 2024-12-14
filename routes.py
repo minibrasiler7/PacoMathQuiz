@@ -1,20 +1,15 @@
 # routes.py
 import json
-from app import app, db, bcrypt
-from forms import RegistrationForm, LoginForm, ExerciseGroupForm, CompetitionForm, EmptyForm, AssignExercisesForm, \
-    ValidateParticipantsForm, CompetitionCodeForm
+from flask import render_template, url_for, flash, redirect, request, abort, jsonify, session
 from flask_login import login_user, current_user, logout_user, login_required
-from flask import render_template, url_for, flash, redirect, request, abort, jsonify
-from forms import ClassForm, StudentForm
+from flask_socketio import join_room, emit
+from app import app, db, bcrypt, socketio
+from forms import (RegistrationForm, LoginForm, ExerciseGroupForm, CompetitionForm, EmptyForm,
+                   AssignExercisesForm, ValidateParticipantsForm, CompetitionCodeForm, ClassForm,
+                   StudentForm, ExerciseForm, MultiStudentForm, StartCompetitionForm)
 from models import User, Exercise, Choice, Class, Student, ExerciseGroup, Competition, CompetitionStudentStat
-from forms import ExerciseForm
 import random
-from flask import session
-from forms import StartCompetitionForm
 from random import randint
-from forms import MultiStudentForm
-
-
 
 @app.route("/")
 @app.route("/home")
@@ -27,11 +22,8 @@ def register():
         return redirect(url_for('home'))
     form = RegistrationForm()
     if form.validate_on_submit():
-        # Hachage du mot de passe
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        # Création de l'utilisateur
         user = User(username=form.username.data, email=form.email.data, password=hashed_password)
-        # Ajout à la base de données
         db.session.add(user)
         db.session.commit()
         flash('Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.', 'success')
@@ -44,10 +36,8 @@ def login():
         return redirect(url_for('home'))
     form = LoginForm()
     if form.validate_on_submit():
-        # Vérification de l'utilisateur
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
-            # Connexion de l'utilisateur
             login_user(user, remember=form.remember.data)
             next_page = request.args.get('next')
             flash('Vous êtes maintenant connecté.', 'success')
@@ -61,7 +51,6 @@ def logout():
     logout_user()
     flash('Vous avez été déconnecté.', 'info')
     return redirect(url_for('home'))
-
 
 @app.route("/classes")
 @login_required
@@ -117,29 +106,23 @@ def delete_class(class_id):
     flash('La classe a été supprimée.', 'success')
     return redirect(url_for('classes'))
 
-# routes.py
-
 @app.route("/class/<int:class_id>/student/new", methods=['GET', 'POST'])
 @login_required
 def new_students(class_id):
     class_instance = Class.query.get_or_404(class_id)
     if class_instance.teacher != current_user:
         abort(403)
-
     form = MultiStudentForm()
-
     if form.validate_on_submit():
         for student_form in form.students.entries:
             student_name = student_form.form.name.data.strip()
-            if student_name:  # Vérifie que le nom n'est pas vide
+            if student_name:
                 student = Student(name=student_name, class_id=class_instance.id)
                 db.session.add(student)
         db.session.commit()
         flash('Les élèves ont été ajoutés avec succès.', 'success')
         return redirect(url_for('class_detail', class_id=class_id))
-
     return render_template('create_student.html', title='Nouvel Élève', form=form, class_instance=class_instance)
-
 
 @app.route("/student/<int:student_id>/delete", methods=['POST'])
 @login_required
@@ -183,7 +166,7 @@ def new_exercise():
             exercise.correct_answer = form.vrai_faux_answer.data
         elif form.exercise_type.data == 'reponse_courte':
             answers = [answer.data.strip() for answer in form.correct_answers.entries]
-            exercise.correct_answer = json.dumps(answers)  # Convertir en JSON
+            exercise.correct_answer = json.dumps(answers)
         else:
             exercise.correct_answer = form.correct_answer.data
         db.session.add(exercise)
@@ -191,7 +174,7 @@ def new_exercise():
         flash('L\'exercice a été créé avec succès.', 'success')
         return redirect(url_for('exercises'))
     else:
-        print(form.errors)  # Pour le débogage
+        print(form.errors)
     return render_template('create_exercise.html', title='Nouvel Exercice', form=form)
 
 @app.route("/exercise/<int:exercise_id>")
@@ -213,9 +196,7 @@ def update_exercise(exercise_id):
         exercise.title = form.title.data
         exercise.question = form.question.data
         exercise.exercise_type = form.exercise_type.data
-        # Mise à jour des choix pour le QCM
         if exercise.exercise_type == 'qcm':
-            # Supprimer les anciens choix
             Choice.query.filter_by(exercise_id=exercise.id).delete()
             for choice_form in form.choices.entries:
                 choice = Choice(text=choice_form.form.text.data, is_correct=choice_form.form.is_correct.data, exercise=exercise)
@@ -232,7 +213,6 @@ def update_exercise(exercise_id):
         form.question.data = exercise.question
         form.exercise_type.data = exercise.exercise_type
         if exercise.exercise_type == 'qcm':
-            # Pré-remplir les choix existants
             choices = exercise.choices
             for i, choice in enumerate(choices):
                 if i < len(form.choices.entries):
@@ -254,8 +234,6 @@ def delete_exercise(exercise_id):
     db.session.commit()
     flash('L\'exercice a été supprimé.', 'success')
     return redirect(url_for('exercises'))
-
-
 
 @app.route("/exercise_groups")
 @login_required
@@ -328,12 +306,10 @@ def assign_exercises_to_group(group_id):
         exercises = Exercise.query.filter_by(teacher_id=current_user.id).all()
         return render_template('assign_exercises_to_group.html', group=group, exercises=exercises, form=form)
 
-
 @app.route("/competition/new", methods=['GET', 'POST'])
 @login_required
 def new_competition():
     form = CompetitionForm()
-    # Peupler les choix du formulaire
     form.group_id.choices = [(group.id, group.name) for group in ExerciseGroup.query.filter_by(teacher_id=current_user.id).all()]
     form.class_id.choices = [(classe.id, classe.name) for classe in Class.query.filter_by(teacher_id=current_user.id).all()]
     if form.validate_on_submit():
@@ -344,15 +320,13 @@ def new_competition():
         group = ExerciseGroup.query.get_or_404(group_id)
         classe = Class.query.get_or_404(class_id)
 
-        print("DEBUG: mode =", mode)  # Ligne de débogage
+        print("DEBUG: mode =", mode)
 
         if mode == 'automatique':
-            # Générer un code aléatoire entre 100000 et 999999
             code = randint(100000, 999999)
         else:
             code = None
 
-        # Créer une nouvelle compétition
         competition = Competition(group=group, class_=classe, mode=mode, code=code)
         db.session.add(competition)
         db.session.commit()
@@ -368,22 +342,19 @@ def competition_detail(competition_id):
         abort(403)
 
     classe = competition.class_
-    students = classe.students  # Liste des élèves de la classe
+    students = classe.students
 
     if competition.mode == 'manuel':
         form = ValidateParticipantsForm()
         if form.validate_on_submit():
-            # Récupérer les élèves sélectionnés
             selected_student_ids = request.form.getlist('student_ids')
             competition.participants = Student.query.filter(Student.id.in_(selected_student_ids)).all()
             print("DEBUG: competition.participants =", [s.name for s in competition.participants])
-            print("DEBUG: selected_student_ids =", selected_student_ids)
             db.session.commit()
             flash('Les élèves présents ont été enregistrés.', 'success')
-            # Rediriger vers la page de démarrage de la compétition
             return redirect(url_for('start_competition', competition_id=competition.id))
         return render_template('competition_detail.html', competition=competition, students=students, form=form)
-    else:  # Mode 'automatique'
+    else:
         form = StartCompetitionForm()
         if form.validate_on_submit():
             if competition.participants:
@@ -393,12 +364,12 @@ def competition_detail(competition_id):
                 flash('Aucun élève n\'a rejoint la compétition.', 'warning')
         return render_template('competition_detail.html', competition=competition, students=students, form=form)
 
-
-@app.route("/competition/<int:competition_id>/start", methods=['GET', 'POST'])
+@app.route("/competition/<int:competition_id>/start", methods=['POST', 'GET'])
 @login_required
 def start_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
 
+    # Charger active_student_ids
     if competition.active_student_ids:
         competition.competition_started = True
         db.session.commit()
@@ -407,26 +378,47 @@ def start_competition(competition_id):
         active_students_list = []
 
     if not active_students_list:
+        # Initialiser active_student_ids avec les participants
         active_students = [student.id for student in competition.participants]
         competition.active_student_ids = json.dumps(active_students)
         competition.current_student_index = 0
-        competition.competition_started = True  # Marquer comme démarré
+        competition.competition_started = True
         db.session.commit()
         flash(f'Élèves actifs initialisés : {active_students}', 'info')
 
-    # Si le mode est automatique, rediriger vers la page de l'enseignant (teacher_view_competition)
-    # Sinon, rediriger vers run_competition
+        # Sélectionner et assigner le premier exercice
+        available_exercises = [ex for ex in competition.group.exercises if ex.id not in json.loads(competition.used_exercise_ids)]
+        if not available_exercises:
+            if competition.group.exercises:
+                # Réinitialiser les exercices utilisés si tous ont été utilisés
+                competition.used_exercise_ids = json.dumps([])
+                available_exercises = competition.group.exercises.copy()
+            else:
+                # Aucun exercice disponible dans le groupe
+                flash('Aucun exercice disponible dans le groupe.', 'danger')
+                return redirect(url_for('competition_results', competition_id=competition.id))
+
+        # Sélectionner un exercice aléatoire
+        exercise = random.choice(available_exercises)
+        competition.current_exercise_id = exercise.id
+        used_exercise_ids = json.loads(competition.used_exercise_ids)
+        used_exercise_ids.append(exercise.id)
+        competition.used_exercise_ids = json.dumps(used_exercise_ids)
+        db.session.commit()
+        flash(f'Exercice initial sélectionné : {exercise.title}', 'info')
+
+        # Émettre la mise à jour via SocketIO
+        update_competition(competition.id)
+
     if competition.mode == 'automatique':
         return redirect(url_for('teacher_view_competition', competition_id=competition.id))
     else:
         return redirect(url_for('run_competition', competition_id=competition.id))
 
 
-
 @app.route("/competition/join", methods=['GET', 'POST'])
 def join_competition():
     form = CompetitionCodeForm()
-
     if form.validate_on_submit():
         code = form.code.data
         competition = Competition.query.filter_by(code=code).first()
@@ -449,9 +441,7 @@ def select_student(competition_id):
     if request.method == 'POST':
         student_id = request.form.get('student_id')
         student = Student.query.get(student_id)
-
         if student and student.class_id == classe.id:
-            # Vérifier si l'élève est déjà inscrit à la compétition
             if student in competition.participants:
                 flash('Vous êtes déjà inscrit à cette compétition.', 'info')
             else:
@@ -468,31 +458,19 @@ def select_student(competition_id):
 def competition_wait(competition_id, student_id):
     competition = Competition.query.get_or_404(competition_id)
     student = Student.query.get_or_404(student_id)
-    session['student_id'] = student.id  # On garde cette ligne pour identifier l'élève
-    # On remplace 'competition_wait.html' par 'run_competition_auto_wait.html'
-    # Et on passe l'ID de l'élève au template pour que le JS puisse le comparer à current_student_id
+    session['student_id'] = student.id
     return render_template('run_competition_auto_wait.html', competition=competition, student=student, student_id=student.id, competition_started=competition.competition_started)
-
 
 def check_answer(exercise, student_answer):
     print("DEBUG: check_answer - exercise_type =", exercise.exercise_type)
     print("DEBUG: check_answer - student_answer =", student_answer)
-
     if exercise.exercise_type == 'qcm':
         correct_choice = next((choice for choice in exercise.choices if choice.is_correct), None)
-        print("DEBUG: check_answer - correct_choice =", correct_choice)
-        if correct_choice:
-            print("DEBUG: check_answer - correct_choice.id =", correct_choice.id)
-            print("DEBUG: check_answer - comparaison =", str(correct_choice.id) == student_answer)
         return str(correct_choice.id) == student_answer if correct_choice else False
     elif exercise.exercise_type == 'vrai_faux':
-        print("DEBUG: check_answer - correct_answer =", exercise.correct_answer)
-        print("DEBUG: comparaison =", exercise.correct_answer.lower() == student_answer.lower())
         return exercise.correct_answer.lower() == student_answer.lower()
     elif exercise.exercise_type == 'reponse_courte':
         correct_answers = json.loads(exercise.correct_answer)
-        print("DEBUG: check_answer - correct_answers =", correct_answers)
-        print("DEBUG: check_answer - comparaison =", student_answer.strip().lower() in [ans.strip().lower() for ans in correct_answers])
         return student_answer.strip().lower() in [ans.strip().lower() for ans in correct_answers]
     else:
         return False
@@ -507,12 +485,17 @@ def get_or_create_stat(competition_id, student_id):
 
 
 @app.route("/competition/<int:competition_id>/run", methods=['GET', 'POST'])
+@login_required
 def run_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
     participants = competition.participants  # Liste des participants
 
     # Charger active_student_ids
-    active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
+    try:
+        active_student_ids = competition.get_active_student_ids()
+    except Exception as e:
+        flash('Erreur de chargement des données de la compétition.', 'danger')
+        return redirect(url_for('competition_detail', competition_id=competition.id))
 
     # Vérification de l'état de la compétition
     if not active_student_ids:
@@ -527,18 +510,17 @@ def run_competition(competition_id):
 
     # Charger used_exercise_ids
     try:
-        used_exercise_ids = json.loads(competition.used_exercise_ids)
+        used_exercise_ids = json.loads(competition.used_exercise_ids) if competition.used_exercise_ids else []
     except json.JSONDecodeError:
-        flash('Erreur de chargement des données de la compétition.', 'danger')
+        flash('Erreur de chargement des données des exercices utilisés.', 'danger')
         return redirect(url_for('competition_detail', competition_id=competition.id))
 
     flash(f'Élèves actifs : {active_student_ids}', 'info')
     flash(f'Exercices utilisés : {used_exercise_ids}', 'info')
 
-    # Vérifier l'index
+    # Vérifier et ajuster l'index actuel
     current_index = competition.current_student_index
     if current_index >= len(active_student_ids):
-        # Réinitialiser l'index si nécessaire
         competition.current_student_index = 0
         current_index = 0
         db.session.commit()
@@ -547,14 +529,9 @@ def run_competition(competition_id):
     current_student_id = active_student_ids[current_index]
     current_student = Student.query.get(current_student_id)
 
-    print("DEBUG: Élève actuel ID =", current_student_id, "Nom =", current_student.name)
-    print("DEBUG: Liste complète des élèves actifs =", active_student_ids)
-    print("DEBUG: Index élève actuel =", current_index)
-
     # Sélectionner un exercice
     available_exercises = [ex for ex in competition.group.exercises if ex.id not in used_exercise_ids]
     if not available_exercises:
-        # Plus de questions disponibles
         if competition.group.exercises:
             used_exercise_ids = []
             available_exercises = competition.group.exercises.copy()
@@ -565,12 +542,14 @@ def run_competition(competition_id):
 
     exercise = random.choice(available_exercises)
     competition.current_exercise_id = exercise.id
-    db.session.commit()
-
-    print("DEBUG: Exercice sélectionné =", exercise.title, "(ID:", exercise.id, ")")
     used_exercise_ids.append(exercise.id)
     competition.used_exercise_ids = json.dumps(used_exercise_ids)
     db.session.commit()
+
+    print(f"DEBUG: Selected Exercise ID: {exercise.id}, Question: {exercise.question}")
+
+    # Émettre la mise à jour
+    update_competition(competition.id)
 
     # Gestion des modes
     if competition.mode == 'manuel':
@@ -593,18 +572,18 @@ def run_competition(competition_id):
                 if not active_student_ids:
                     flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
                     db.session.commit()
+                    update_competition(competition.id)
                     return redirect(url_for('competition_results', competition_id=competition.id))
             else:
                 flash('Résultat invalide.', 'danger')
+                return redirect(url_for('run_competition', competition_id=competition.id))
 
-            # Élève suivant
-            new_index = (current_index + 1) % len(active_student_ids) if active_student_ids else 0
-            competition.current_student_index = new_index
-            db.session.commit()
-
-            print("DEBUG: Après la réponse en mode manuel")
-            print("DEBUG: active_student_ids =", active_student_ids)
-            print("DEBUG: current_student_index =", competition.current_student_index)
+            # Élève suivant si la réponse était correcte
+            if result == 'correct':
+                new_index = (current_index + 1) % len(active_student_ids) if active_student_ids else 0
+                competition.current_student_index = new_index
+                db.session.commit()
+                update_competition(competition.id)
 
             return redirect(url_for('run_competition', competition_id=competition.id))
 
@@ -637,6 +616,7 @@ def run_competition(competition_id):
                     # Incrémenter le compteur de réponses correctes
                     stat = get_or_create_stat(competition.id, current_student_id)
                     stat.correct_answers += 1
+                    # Passer au prochain élève
                     new_index = (current_index + 1) % len(active_student_ids) if active_student_ids else 0
                     competition.current_student_index = new_index
                 else:
@@ -649,18 +629,17 @@ def run_competition(competition_id):
                     if not active_student_ids:
                         flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
                         db.session.commit()
+                        update_competition(competition.id)
                         return redirect(url_for('competition_results', competition_id=competition.id))
 
-                    # Rester sur le même index pour le prochain élève
+                    # Rester sur le même élève si mauvaise réponse
                     competition.current_student_index = current_index
 
                 db.session.commit()
+                # Émettre une mise à jour de la compétition
+                update_competition(competition.id)
 
-                print("DEBUG: Après la réponse en mode automatique")
-                print("DEBUG: active_student_ids =", active_student_ids)
-                print("DEBUG: current_student_index =", competition.current_student_index)
-
-                return render_template('run_competition_auto_wait.html', competition=competition, student_id=student_id)
+                return render_template('run_competition_auto_wait.html', competition=competition, student=student, student_id=student_id)
 
             # GET : Afficher la question
             return render_template('run_competition_auto_current.html',
@@ -669,30 +648,87 @@ def run_competition(competition_id):
                                    exercise=exercise)
         else:
             # Ce n'est pas le tour de cet élève
-            return render_template('run_competition_auto_wait.html', competition=competition)
+            # **Correction Importante :** Passer l'objet élève du visiteur, pas le current_student
+            # Vous devez récupérer l'objet élève correspondant à student_id
+            visitor_student = Student.query.get(student_id)
+            return render_template('run_competition_auto_wait.html', competition=competition, student=visitor_student, student_id=student_id)
+
+
+
+@app.route("/competition/<int:competition_id>/run_current/<int:student_id>", methods=['GET', 'POST'])
+def run_competition_auto_current(competition_id, student_id):
+    competition = Competition.query.get_or_404(competition_id)
+    student = Student.query.get_or_404(student_id)
+
+    if student not in competition.participants:
+        flash('Vous n\'êtes pas inscrit à cette compétition.', 'danger')
+        return redirect(url_for('join_competition'))
+
+    # Vérifiez si c'est le tour de cet élève
+    current_student_id = competition.get_current_student_id()
+    if str(current_student_id) != str(student_id):
+        flash('Ce n\'est pas votre tour.', 'warning')
+        return redirect(url_for('competition_wait', competition_id=competition_id, student_id=student_id))
+
+    # Récupérer l'exercice actuel
+    current_exercise = Exercise.query.get(competition.current_exercise_id)
+
+    if request.method == 'POST':
+        # Gérer la soumission de la réponse par l'élève
+        submitted_exercise_id = request.form.get('exercise_id')
+        submitted_exercise = Exercise.query.get(submitted_exercise_id)
+        student_answer = request.form.get('answer')
+        correct = check_answer(submitted_exercise, student_answer)
+
+        if correct:
+            flash('Bonne réponse !', 'success')
+            stat = get_or_create_stat(competition.id, student_id)
+            stat.correct_answers += 1
+            # Passer au prochain élève
+            new_index = (competition.current_student_index + 1) % len(competition.get_active_student_ids()) if competition.get_active_student_ids() else 0
+            competition.current_student_index = new_index
+        else:
+            # Éliminer l'élève
+            active_student_ids = competition.get_active_student_ids()
+            active_student_ids.remove(student_id)
+            competition.active_student_ids = json.dumps(active_student_ids)
+            flash(f"Mauvaise réponse. L'élève {student.name} est éliminé.", 'danger')
+
+            # Vérifier si tous éliminés
+            if not active_student_ids:
+                flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
+                db.session.commit()
+                update_competition(competition.id)
+                return redirect(url_for('competition_results', competition_id=competition.id))
+
+            # Mettre à jour l'index pour le prochain élève
+            competition.current_student_index = competition.current_student_index % len(active_student_ids)
+
+        db.session.commit()
+        # Émettre une mise à jour de la compétition
+        update_competition(competition.id)
+        return redirect(url_for('run_competition', competition_id=competition.id))
+
+    return render_template('run_competition_auto_current.html',
+                           competition=competition,
+                           student=student,
+                           exercise=current_exercise)
 
 
 @app.route("/competition/<int:competition_id>/results")
 def competition_results(competition_id):
     competition = Competition.query.get_or_404(competition_id)
-
-    # Charger active_student_ids et participants
     active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
     eliminated_student_ids = [s.id for s in competition.participants if s.id not in active_student_ids]
 
-    # Récupérer les statistiques des élèves
     stats = CompetitionStudentStat.query.filter_by(competition_id=competition.id).all()
-    # Créer un dictionnaire pour accéder rapidement aux statistiques par student_id
     stats_dict = {stat.student_id: stat.correct_answers for stat in stats}
 
-    # Récupérer les élèves et ajouter leur nombre de réponses justes
     active_students = Student.query.filter(Student.id.in_(active_student_ids)).all()
     eliminated_students = Student.query.filter(Student.id.in_(eliminated_student_ids)).all()
 
-    # Trier les élèves actifs par nombre de réponses justes décroissant
     active_students_sorted = sorted(active_students, key=lambda s: stats_dict.get(s.id, 0), reverse=True)
     eliminated_students = sorted(eliminated_students, key=lambda s: stats_dict.get(s.id, 0), reverse=True)
-
 
     return render_template('competition_results.html',
                            competition=competition,
@@ -708,7 +744,6 @@ def competition_status(competition_id):
     if active_students_list and 0 <= competition.current_student_index < len(active_students_list):
         current_student_id = active_students_list[competition.current_student_index]
 
-    # Ajouter competition_started
     competition_started = getattr(competition, 'competition_started', False)
 
     data = {
@@ -718,40 +753,31 @@ def competition_status(competition_id):
     }
     return jsonify(data)
 
-
-
 @app.route("/competition/<int:competition_id>/teacher_view")
 @login_required
 def teacher_view_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
-
-    # Vérifier que l'utilisateur courant est l'enseignant
     if competition.group.teacher != current_user:
         abort(403)
 
     active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
 
-    # S'il n'y a plus d'élèves actifs, rediriger vers les résultats
     if not active_student_ids:
         return redirect(url_for('competition_results', competition_id=competition.id))
 
     current_index = competition.current_student_index
-    # Si l'index actuel est hors limites, le réinitialiser à 0
     if current_index >= len(active_student_ids):
         competition.current_student_index = 0
         current_index = 0
         db.session.commit()
 
-    # Maintenant, current_index est forcément valide et on peut accéder à l'élève courant
     current_student_id = active_student_ids[current_index]
     current_student = Student.query.get(current_student_id)
 
-    # Charger la question actuelle si elle est stockée
     current_exercise = None
     if competition.current_exercise_id:
         current_exercise = Exercise.query.get(competition.current_exercise_id)
-
-    # Participants de la compétition
+    print(current_exercise)
     participants = competition.participants
 
     return render_template('competition_teacher_view.html',
@@ -761,33 +787,50 @@ def teacher_view_competition(competition_id):
                            active_student_ids=active_student_ids,
                            participants=participants)
 
+# Gestion des événements SocketIO
+@socketio.on('connect')
+def handle_connect():
+    print('Un client est connecté.')
 
-@app.route("/competition/<int:competition_id>/teacher_status")
-@login_required
-def teacher_status(competition_id):
-    competition = Competition.query.get_or_404(competition_id)
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Un client est déconnecté.')
 
-    # Vérifier que c’est bien l’enseignant
-    if competition.group.teacher != current_user:
-        abort(403)
+@socketio.on('join_competition')
+def handle_join_competition(data):
+    competition_id = data.get('competition_id')
+    student_id = data.get('student_id')
+    room = f'competition_{competition_id}'
+    join_room(room)
+    print(f'Élève {student_id} a rejoint la compétition {competition_id}.')
+    emit('message', {'data': f'Bienvenue à la compétition {competition_id}!'}, room=room)
 
-    active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
-    current_student_id = None
-    current_exercise_id = competition.current_exercise_id  # Assurez-vous d'avoir ce champ dans Competition
+# routes.py
 
-    if active_student_ids:
-        current_index = competition.current_student_index
-        if 0 <= current_index < len(active_student_ids):
-            current_student_id = active_student_ids[current_index]
+def update_competition(competition_id):
+    competition = Competition.query.get(competition_id)
+    active_student_ids = competition.get_active_student_ids()
+    competition_started = competition.competition_started
+    current_student_id = competition.get_current_student_id()
 
-    # Retourner les infos au format JSON
+    # Récupérer les détails de l'exercice actuel
+    current_exercise = None
+    if competition.current_exercise_id:
+        current_exercise = Exercise.query.get(competition.current_exercise_id)
+
     data = {
-        "current_student_id": current_student_id,
-        "current_exercise_id": current_exercise_id,
-        "active_student_ids": active_student_ids
+        'active_student_ids': active_student_ids,
+        'competition_started': competition_started,
+        'current_student_id': current_student_id,
+        'current_exercise_id': competition.current_exercise_id,
+        'current_exercise_question': current_exercise.question if current_exercise else None,
+        'current_exercise_type': current_exercise.exercise_type if current_exercise else None,
+        'current_exercise_choices': [
+            {'id': choice.id, 'text': choice.text} for choice in current_exercise.choices
+        ] if current_exercise and current_exercise.exercise_type == 'qcm' else None
     }
-    return jsonify(data)
 
-
-
+    room = f'competition_{competition_id}'
+    socketio.emit('competition_update', data, room=room)
+    print(f"DEBUG: Emitted competition_update to room {room} with data {data}")
 

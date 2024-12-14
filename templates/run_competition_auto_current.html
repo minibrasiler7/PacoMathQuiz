@@ -1,3 +1,4 @@
+{# run_competition_auto_current.html #}
 {% extends "layout.html" %}
 {% block content %}
 <h2>Compétition : {{ competition.group.name }}</h2>
@@ -6,7 +7,7 @@
 <p>{{ exercise.question }}</p>
 
 <!-- Formulaire pour répondre à la question -->
-<form method="POST">
+<form method="POST" id="answer-form">
   {% if exercise.exercise_type == 'qcm' %}
     {% for choice in exercise.choices %}
       <div class="form-check">
@@ -39,23 +40,41 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  let timeRemaining = 10; // durée en secondes
-  const timeDisplay = document.getElementById('time-remaining');
+<script src="https://cdn.socket.io/4.5.1/socket.io.min.js" crossorigin="anonymous"></script>
+<script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", () => {
+    var socket = io();
 
-  const intervalId = setInterval(() => {
-    timeRemaining--;
-    timeDisplay.textContent = timeRemaining;
+    // Rejoindre une salle spécifique pour la compétition
+    socket.emit('join_competition', {'competition_id': {{ competition.id }}, 'student_id': {{ student_id }} });
 
-    if (timeRemaining <= 0) {
-      clearInterval(intervalId);
-      // Quand le temps est écoulé, on peut soumettre automatiquement le formulaire
-      // ou afficher un message, par exemple :
+    // Gérer le compte à rebours
+    let timeRemaining = 10; // durée en secondes
+    const timeDisplay = document.getElementById('time-remaining');
+    const intervalId = setInterval(() => {
+      timeRemaining--;
+      timeDisplay.textContent = timeRemaining;
 
-      // Soumission automatique du formulaire
-      document.querySelector('form').submit();
-    }
-  }, 1000);
+      if (timeRemaining <= 0) {
+        clearInterval(intervalId);
+        // Soumettre automatiquement le formulaire
+        document.getElementById('answer-form').submit();
+      }
+    }, 1000);
+
+    // Écouter l'événement 'competition_update' pour ajuster le compte à rebours si nécessaire
+    socket.on('competition_update', (data) => {
+      if (!data.competition_started) {
+        console.log("La compétition n'a pas encore commencé.");
+        // Optionnel : Réinitialiser le compte à rebours ou afficher un message
+      }
+    });
+
+    // Optionnel : Écouter des événements spécifiques
+    socket.on('time_extended', (data) => {
+      timeRemaining += data.additional_time;
+      console.log(`Temps additionnel ajouté: ${data.additional_time} secondes`);
+    });
+  });
 </script>
 {% endblock %}
-

@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+{# layout.html #}
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
@@ -9,6 +10,9 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto+Condensed|Pacifico&display=swap">
     <!-- Votre fichier CSS personnalisé -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Ajoutez ceci dans vos templates dans le bloc head ou juste avant la fin du body -->
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js" crossorigin="anonymous"></script>
+
 </head>
 <body class="d-flex flex-column min-vh-100">
     {% include 'navbar.html' %}
