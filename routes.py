@@ -448,6 +448,8 @@ def select_student(competition_id):
                 competition.participants.append(student)
                 db.session.commit()
                 flash(f'Vous avez rejoint la compétition. Participants actuels : {[s.name for s in competition.participants]}', 'success')
+
+            session['student_id'] = student.id
             return redirect(url_for('competition_wait', competition_id=competition.id, student_id=student.id))
         else:
             flash('Sélection invalide.', 'danger')
@@ -458,7 +460,6 @@ def select_student(competition_id):
 def competition_wait(competition_id, student_id):
     competition = Competition.query.get_or_404(competition_id)
     student = Student.query.get_or_404(student_id)
-    session['student_id'] = student.id
     return render_template('run_competition_auto_wait.html', competition=competition, student=student, student_id=student.id, competition_started=competition.competition_started)
 
 def check_answer(exercise, student_answer):
@@ -482,112 +483,146 @@ def get_or_create_stat(competition_id, student_id):
         db.session.add(stat)
         db.session.commit()
     return stat
-
-
 @app.route("/competition/<int:competition_id>/run", methods=['GET', 'POST'])
-@login_required
 def run_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
     participants = competition.participants  # Liste des participants
 
-    # Charger active_student_ids
+    def check_last_student_dominance(competition):
+        active_students = competition.get_active_student_ids()
+        if len(active_students) == 1:
+            last_student_id = active_students[0]
+            stats = CompetitionStudentStat.query.filter_by(competition_id=competition.id).all()
+            last_stat = next((s for s in stats if s.student_id == last_student_id), None)
+            if last_stat:
+                last_score = last_stat.correct_answers
+                print(f"last_score : {last_score}")
+                other_scores = [s.correct_answers for s in stats if s.student_id != last_student_id]
+                print(f"other_scores : {other_scores}")
+                if all(last_score > score for score in other_scores):
+                    return True
+        return False
+
+    def handle_last_player_scenario():
+        # Appelée lorsque le dernier élève vient de répondre correctement
+        # On vérifie la dominance
+        if check_last_student_dominance(competition):
+            # Il a plus de points que tous les autres
+            update_competition(competition.id, competition_ended=True)
+            return redirect(url_for('competition_results', competition_id=competition.id))
+        else:
+            # Il n'a pas surpassé, on décrémente une chance
+            competition.last_player_chances -= 1
+            db.session.commit()
+            if competition.last_player_chances <= 0:
+                # Plus de chances restantes, on termine la compétition
+                update_competition(competition.id, competition_ended=True)
+                return redirect(url_for('competition_results', competition_id=competition.id))
+            # S'il reste une chance, on continue la compétition
+            # Pas de return ici pour laisser le flux normal continuer
+            return None
+
+    # Chargement des élèves actifs
     try:
         active_student_ids = competition.get_active_student_ids()
     except Exception as e:
         flash('Erreur de chargement des données de la compétition.', 'danger')
         return redirect(url_for('competition_detail', competition_id=competition.id))
 
-    # Vérification de l'état de la compétition
+    # Vérification initiale
     if not active_student_ids:
         if not participants:
-            # Pas de participants => la compétition n'a pas commencé
             flash("La compétition n'a pas encore démarré ou aucun élève actif.", 'warning')
             return redirect(url_for('competition_detail', competition_id=competition.id))
         else:
-            # Participants présents mais plus personne d'actif => Tous éliminés
             flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
+            update_competition(competition.id, competition_ended=True)
             return redirect(url_for('competition_results', competition_id=competition.id))
 
-    # Charger used_exercise_ids
+    # Charger les exercices utilisés
     try:
         used_exercise_ids = json.loads(competition.used_exercise_ids) if competition.used_exercise_ids else []
     except json.JSONDecodeError:
         flash('Erreur de chargement des données des exercices utilisés.', 'danger')
         return redirect(url_for('competition_detail', competition_id=competition.id))
 
-    flash(f'Élèves actifs : {active_student_ids}', 'info')
-    flash(f'Exercices utilisés : {used_exercise_ids}', 'info')
-
-    # Vérifier et ajuster l'index actuel
+    # Ajustement de l'index
     current_index = competition.current_student_index
     if current_index >= len(active_student_ids):
         competition.current_student_index = 0
         current_index = 0
         db.session.commit()
 
-    # Élève actuel
     current_student_id = active_student_ids[current_index]
     current_student = Student.query.get(current_student_id)
 
-    # Sélectionner un exercice
+    # Sélection d'un exercice
     available_exercises = [ex for ex in competition.group.exercises if ex.id not in used_exercise_ids]
     if not available_exercises:
         if competition.group.exercises:
+            # On réinitialise
             used_exercise_ids = []
+            competition.used_exercise_ids = json.dumps([])
+            db.session.commit()
             available_exercises = competition.group.exercises.copy()
+            # Vérifier si now available_exercises est toujours vide
+            if not available_exercises:
+                flash('Aucune question disponible.', 'danger')
+                update_competition(competition.id, competition_ended=True)
+                return redirect(url_for('competition_results', competition_id=competition.id))
         else:
-            # Plus aucun exercice dans le groupe
-            flash('Aucune question disponible dans le groupe.', 'danger')
+            # Aucun exercice du tout dans le groupe
+            flash('Aucune question disponible.', 'danger')
+            update_competition(competition.id, competition_ended=True)
             return redirect(url_for('competition_results', competition_id=competition.id))
 
+
     exercise = random.choice(available_exercises)
-    competition.current_exercise_id = exercise.id
     used_exercise_ids.append(exercise.id)
+    competition.current_exercise_id = exercise.id
     competition.used_exercise_ids = json.dumps(used_exercise_ids)
     db.session.commit()
 
-    print(f"DEBUG: Selected Exercise ID: {exercise.id}, Question: {exercise.question}")
-
-    # Émettre la mise à jour
     update_competition(competition.id)
 
-    # Gestion des modes
     if competition.mode == 'manuel':
-        # Mode manuel
         if request.method == 'POST':
             result = request.form.get('result')
             if result == 'correct':
-                flash(f"L'élève {current_student.name} continue.", 'success')
-                # Incrémenter le compteur de réponses correctes
                 stat = get_or_create_stat(competition.id, current_student_id)
                 stat.correct_answers += 1
                 db.session.commit()
+
+                if len(active_student_ids) == 1:
+                    # Dernier élève
+                    maybe_end = handle_last_player_scenario()
+                    if maybe_end:
+                        return maybe_end
+
+                flash(f"L'élève {current_student.name} continue.", 'success')
+
             elif result == 'incorrect':
-                # Éliminer l'élève
                 active_student_ids.remove(current_student_id)
                 competition.active_student_ids = json.dumps(active_student_ids)
+                db.session.commit()
                 flash(f"L'élève {current_student.name} a été éliminé.", 'danger')
 
-                # Vérifier si tous éliminés
                 if not active_student_ids:
-                    flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
-                    db.session.commit()
-                    update_competition(competition.id)
+                    update_competition(competition.id, competition_ended=True)
                     return redirect(url_for('competition_results', competition_id=competition.id))
+
             else:
                 flash('Résultat invalide.', 'danger')
                 return redirect(url_for('run_competition', competition_id=competition.id))
 
-            # Élève suivant si la réponse était correcte
-            if result == 'correct':
-                new_index = (current_index + 1) % len(active_student_ids) if active_student_ids else 0
+            if result == 'correct' and len(active_student_ids) > 1:
+                new_index = (current_index + 1) % len(active_student_ids)
                 competition.current_student_index = new_index
                 db.session.commit()
                 update_competition(competition.id)
 
             return redirect(url_for('run_competition', competition_id=competition.id))
 
-        # Préparer l'affichage
         active_students = Student.query.filter(Student.id.in_(active_student_ids)).all()
         students_dict = {s.id: s.name for s in active_students}
         return render_template('run_competition_manual.html',
@@ -596,15 +631,16 @@ def run_competition(competition_id):
                                exercise=exercise,
                                active_student_ids=active_student_ids,
                                students_dict=students_dict)
-
     else:
-        # Mode automatique
-        student_id = session.get('student_id')
-        if not student_id:
+        visitor_student_id = session.get('student_id')
+        print(f"Creation du visitor id: {visitor_student_id}")
+        if not visitor_student_id:
             flash('Vous devez rejoindre la compétition d\'abord.', 'danger')
             return redirect(url_for('join_competition'))
 
-        if str(student_id) == str(current_student_id):
+        visitor_student = Student.query.get(visitor_student_id)
+
+        if str(visitor_student_id) == str(current_student_id):
             if request.method == 'POST':
                 submitted_exercise_id = request.form.get('exercise_id')
                 submitted_exercise = Exercise.query.get(submitted_exercise_id)
@@ -612,47 +648,43 @@ def run_competition(competition_id):
                 correct = check_answer(submitted_exercise, student_answer)
 
                 if correct:
-                    flash('Bonne réponse !', 'success')
-                    # Incrémenter le compteur de réponses correctes
                     stat = get_or_create_stat(competition.id, current_student_id)
                     stat.correct_answers += 1
-                    # Passer au prochain élève
-                    new_index = (current_index + 1) % len(active_student_ids) if active_student_ids else 0
-                    competition.current_student_index = new_index
+                    db.session.commit()
+
+                    if len(active_student_ids) == 1:
+                        maybe_end = handle_last_player_scenario()
+                        if maybe_end:
+                            return maybe_end
+
+                    if len(active_student_ids) > 1:
+                        new_index = (current_index + 1) % len(active_student_ids)
+                        competition.current_student_index = new_index
+                        db.session.commit()
+                    flash('Bonne réponse !', 'success')
                 else:
-                    # Éliminer l'élève
                     active_student_ids.remove(current_student_id)
                     competition.active_student_ids = json.dumps(active_student_ids)
+                    db.session.commit()
                     flash(f"Mauvaise réponse. L'élève {current_student.name} est éliminé.", 'danger')
 
-                    # Vérifier si tous éliminés
                     if not active_student_ids:
-                        flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
-                        db.session.commit()
-                        update_competition(competition.id)
+                        update_competition(competition.id, competition_ended=True)
                         return redirect(url_for('competition_results', competition_id=competition.id))
 
-                    # Rester sur le même élève si mauvaise réponse
-                    competition.current_student_index = current_index
-
-                db.session.commit()
-                # Émettre une mise à jour de la compétition
                 update_competition(competition.id)
+                return redirect(url_for('competition_wait', competition_id=competition.id, student_id=visitor_student.id))
 
-                return render_template('run_competition_auto_wait.html', competition=competition, student=student, student_id=student_id)
-
-            # GET : Afficher la question
             return render_template('run_competition_auto_current.html',
                                    competition=competition,
-                                   student=current_student,
-                                   exercise=exercise)
+                                   student=visitor_student,
+                                   exercise=exercise,
+                                   student_id=visitor_student.id)
         else:
-            # Ce n'est pas le tour de cet élève
-            # **Correction Importante :** Passer l'objet élève du visiteur, pas le current_student
-            # Vous devez récupérer l'objet élève correspondant à student_id
-            visitor_student = Student.query.get(student_id)
-            return render_template('run_competition_auto_wait.html', competition=competition, student=visitor_student, student_id=student_id)
-
+            return render_template('run_competition_auto_wait.html',
+                                   competition=competition,
+                                   student=visitor_student,
+                                   student_id=visitor_student.id)
 
 
 @app.route("/competition/<int:competition_id>/run_current/<int:student_id>", methods=['GET', 'POST'])
@@ -660,15 +692,23 @@ def run_competition_auto_current(competition_id, student_id):
     competition = Competition.query.get_or_404(competition_id)
     student = Student.query.get_or_404(student_id)
 
+    # Vérification que le user est un élève participant
     if student not in competition.participants:
         flash('Vous n\'êtes pas inscrit à cette compétition.', 'danger')
         return redirect(url_for('join_competition'))
 
-    # Vérifiez si c'est le tour de cet élève
+    # Vérification du visitor_student_id depuis la session
+    visitor_student_id = session.get('student_id')
+    print(f"Visitor student id : {visitor_student_id} et student_id:  {student_id} competition_id {competition}")
+    if visitor_student_id is None or visitor_student_id != student_id:
+        flash('Vous ne pouvez pas répondre en tant que cet élève.', 'danger')
+        return redirect(url_for('competition_wait', competition_id=competition_id, student_id=student_id))
+
     current_student_id = competition.get_current_student_id()
     if str(current_student_id) != str(student_id):
         flash('Ce n\'est pas votre tour.', 'warning')
         return redirect(url_for('competition_wait', competition_id=competition_id, student_id=student_id))
+
 
     # Récupérer l'exercice actuel
     current_exercise = Exercise.query.get(competition.current_exercise_id)
@@ -807,16 +847,13 @@ def handle_join_competition(data):
 
 # routes.py
 
-def update_competition(competition_id):
+def update_competition(competition_id, competition_ended=False):
     competition = Competition.query.get(competition_id)
     active_student_ids = competition.get_active_student_ids()
     competition_started = competition.competition_started
     current_student_id = competition.get_current_student_id()
 
-    # Récupérer les détails de l'exercice actuel
-    current_exercise = None
-    if competition.current_exercise_id:
-        current_exercise = Exercise.query.get(competition.current_exercise_id)
+    current_exercise = Exercise.query.get(competition.current_exercise_id) if competition.current_exercise_id else None
 
     data = {
         'active_student_ids': active_student_ids,
@@ -827,10 +864,12 @@ def update_competition(competition_id):
         'current_exercise_type': current_exercise.exercise_type if current_exercise else None,
         'current_exercise_choices': [
             {'id': choice.id, 'text': choice.text} for choice in current_exercise.choices
-        ] if current_exercise and current_exercise.exercise_type == 'qcm' else None
+        ] if current_exercise and current_exercise.exercise_type == 'qcm' else None,
+        'competition_ended': competition_ended
     }
 
     room = f'competition_{competition_id}'
     socketio.emit('competition_update', data, room=room)
     print(f"DEBUG: Emitted competition_update to room {room} with data {data}")
+
 

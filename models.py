@@ -107,7 +107,7 @@ class Competition(db.Model):
     participants = db.relationship('Student', secondary=competition_participants, backref='competitions')
     student_stats = db.relationship('CompetitionStudentStat', back_populates='competition', cascade="all, delete-orphan")
     current_exercise = db.relationship('Exercise', backref='current_competition', lazy=True)
-
+    last_player_chances = db.Column(db.Integer, default=1)
     def get_active_student_ids(self):
         """Retourne une liste des IDs des étudiants actuellement actifs dans la compétition."""
         if self.active_student_ids:

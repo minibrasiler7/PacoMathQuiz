@@ -30,6 +30,13 @@
         window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
         return;
       }
+      if (data.competition_ended) {
+        // Rediriger tous les clients (enseignant, élèves en attente, élèves éliminés)
+        // vers la page des résultats.
+        window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
+       return;
+       }
+
 
       if (data.current_student_id == {{ student_id }}) {  // Utilisation correcte de 'student_id'
         console.log("C'est votre tour, redirection vers run_competition_auto_current");
