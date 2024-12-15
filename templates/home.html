@@ -1,4 +1,3 @@
-{# home.html #}
 {% extends "layout.html" %}
 {% block title %}Accueil{% endblock %}
 {% block content %}
@@ -8,9 +7,9 @@
                 <h1 class="display-4">Bienvenue sur PAQO</h1>
                 <p class="lead">Votre plateforme éducative pour des quiz de mathématiques amusants et interactifs.</p>
                 <hr class="my-4">
-                <div class="d-flex flex-wrap">
-                    <a href="{{ url_for('new_competition') }}" class="btn btn-orange btn-lg mr-2 mb-2">Démarrer une Compétition</a>
-                    <a href="{{ url_for('join_competition') }}" class="btn btn-orange btn-lg mb-2">Rejoindre une Compétition</a>
+                <div class="d-flex flex-column flex-md-row">
+                    <a href="{{ url_for('new_competition') }}" class="btn btn-orange btn-lg mb-2 mb-md-0 mr-md-2 w-100">Démarrer une Compétition</a>
+                    <a href="{{ url_for('join_competition') }}" class="btn btn-orange btn-lg w-100">Rejoindre une Compétition</a>
                 </div>
             </div>
             <div class="col-md-6 text-center">
