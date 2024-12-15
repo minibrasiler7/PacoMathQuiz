@@ -5,12 +5,15 @@ body {
     background-color: #f0f8ff; /* Bleu clair agréable */
     font-size: 16px; /* Taille de police par défaut */
     line-height: 1.6; /* Meilleure lisibilité */
+    font-family: 'Roboto Condensed', sans-serif; /* Assurer une bonne lisibilité */
+    color: #333333;
 }
 
 /* Personnalisation de la barre de navigation */
 .navbar {
     background-color: #4CAF50; /* Vert vibrant pour une ambiance mathématique */
     padding: 1rem 1.5rem; /* Augmenter le padding pour une barre plus grande */
+    height: auto; /* Assurer que la hauteur s'ajuste automatiquement */
 }
 
 .navbar-brand, .navbar-nav .nav-link {
@@ -61,28 +64,18 @@ body, p, li, a, .btn {
     font-size: 1rem; /* Taille de police augmentée */
 }
 
-/* Boutons personnalisés */
-.btn-primary {
-    background-color: #4CAF50;
-    border-color: #4CAF50;
-    padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
-    font-size: 1.25rem; /* Augmenter la taille du texte */
-}
-
-.btn-primary:hover {
-    background-color: #45a049;
-    border-color: #45a049;
-}
-
-.btn-orange {
+/* Boutons personnalisés - Uniformiser tous les boutons en orange */
+.btn, .btn-primary {
     background-color: #FFA500; /* Orange vibrant */
     border-color: #FFA500;
     color: #ffffff; /* Texte blanc pour le contraste */
     padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
     font-size: 1.25rem; /* Augmenter la taille du texte */
+    border-radius: 5px; /* Assurer des coins arrondis */
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.btn-orange:hover {
+.btn:hover, .btn-primary:hover {
     background-color: #e69500; /* Orange plus foncé au survol */
     border-color: #e69500;
     color: #ffffff;
@@ -159,13 +152,14 @@ footer {
 
 /* Responsiveness */
 @media (max-width: 768px) {
+    /* Agrandir le texte de la navbar */
     .navbar-brand, .navbar-nav .nav-link {
-        font-size: 1.5rem; /* Agrandir le texte de la navbar */
+        font-size: 1.5rem;
     }
 
     /* Ajustement de la barre de navigation pour mobile */
     .navbar {
-        padding: 1.5rem 1rem; /* Augmenter le padding pour une navbar plus grande */
+        padding: 2rem 1rem; /* Augmenter le padding pour une navbar plus grande */
     }
 
     /* Ajustement des titres pour mobile */
@@ -189,8 +183,8 @@ footer {
     .jumbotron .btn {
         width: 100%; /* Faire en sorte que les boutons prennent toute la largeur */
         margin-bottom: 1rem; /* Ajouter de l'espace entre les boutons */
-        font-size: 1.25rem; /* Agrandir le texte des boutons */
-        padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
+        font-size: 1.5rem; /* Agrandir le texte des boutons */
+        padding: 1rem 2rem; /* Augmenter la taille des boutons */
     }
 
     /* Ajuster les marges et les paddings */
@@ -269,7 +263,7 @@ footer {
     }
 
     .navbar-brand, .navbar-nav .nav-link {
-        font-size: 1.25rem;
+        font-size: 1.5rem; /* Augmenter davantage le texte */
     }
 
     .form-control {
@@ -278,8 +272,8 @@ footer {
     }
 
     .btn-primary, .btn-orange {
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
+        font-size: 1.25rem; /* Augmenter la taille du texte */
+        padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
     }
 
     table {

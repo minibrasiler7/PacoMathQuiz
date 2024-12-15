@@ -38,7 +38,7 @@
 
 <div id="timer-container" style="margin-top:20px;">
   <span id="hourglass" style="font-size:2rem;">⏳</span>
-  <span>Il vous reste <span id="time-remaining">10</span> secondes pour répondre.</span>
+  <span>Il vous reste <span id="time-remaining">30</span> secondes pour répondre.</span>
 </div>
 {% endblock %}
 
@@ -53,7 +53,7 @@
     socket.emit('join_competition', {'competition_id': "{{ competition.id }}", 'student_id': "{{ student_id }}" });
     console.log("Événement join_competition émis");
 
-    let timeRemaining = 10;
+    let timeRemaining = 30;
     const timeDisplay = document.getElementById('time-remaining');
     console.log("timeDisplay=", timeDisplay);
 
