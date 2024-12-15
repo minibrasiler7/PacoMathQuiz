@@ -10,6 +10,7 @@ body {
 /* Personnalisation de la barre de navigation */
 .navbar {
     background-color: #4CAF50; /* Vert vibrant pour une ambiance mathématique */
+    padding: 1rem 1.5rem; /* Augmenter le padding pour une barre plus grande */
 }
 
 .navbar-brand, .navbar-nav .nav-link {
@@ -64,8 +65,8 @@ body, p, li, a, .btn {
 .btn-primary {
     background-color: #4CAF50;
     border-color: #4CAF50;
-    padding: 0.5rem 1rem; /* Augmenter la taille des boutons */
-    font-size: 1rem;
+    padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
+    font-size: 1.25rem; /* Augmenter la taille du texte */
 }
 
 .btn-primary:hover {
@@ -77,8 +78,8 @@ body, p, li, a, .btn {
     background-color: #FFA500; /* Orange vibrant */
     border-color: #FFA500;
     color: #ffffff; /* Texte blanc pour le contraste */
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
+    padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
+    font-size: 1.25rem; /* Augmenter la taille du texte */
 }
 
 .btn-orange:hover {
@@ -158,10 +159,16 @@ footer {
 
 /* Responsiveness */
 @media (max-width: 768px) {
-    .navbar-brand {
-        font-size: 1.5rem;
+    .navbar-brand, .navbar-nav .nav-link {
+        font-size: 1.5rem; /* Agrandir le texte de la navbar */
     }
 
+    /* Ajustement de la barre de navigation pour mobile */
+    .navbar {
+        padding: 1.5rem 1rem; /* Augmenter le padding pour une navbar plus grande */
+    }
+
+    /* Ajustement des titres pour mobile */
     h1 {
         font-size: 2rem;
     }
@@ -178,14 +185,17 @@ footer {
         font-size: 1.25rem;
     }
 
-    .form-control {
-        font-size: 1rem;
-        padding: 0.75rem 1rem;
+    /* Ajustement des boutons sur la page d'accueil */
+    .jumbotron .btn {
+        width: 100%; /* Faire en sorte que les boutons prennent toute la largeur */
+        margin-bottom: 1rem; /* Ajouter de l'espace entre les boutons */
+        font-size: 1.25rem; /* Agrandir le texte des boutons */
+        padding: 0.75rem 1.5rem; /* Augmenter la taille des boutons */
     }
 
-    .btn-primary, .btn-orange {
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
+    /* Ajuster les marges et les paddings */
+    .container, .container-fluid {
+        padding: 0.5rem;
     }
 
     /* Ajuster les tableaux pour les petits écrans */
@@ -197,11 +207,6 @@ footer {
     /* Ajuster les cartes */
     .card {
         margin-bottom: 1rem;
-    }
-
-    /* Ajuster les marges et les paddings */
-    .container, .container-fluid {
-        padding: 0.5rem;
     }
 
     /* Ajuster les polices dans le pied de page */
@@ -241,23 +246,6 @@ footer {
   100% { transform: rotate(360deg); }
 }
 
-/* styles.css */
-
-/* Classe personnalisée pour les boutons orange */
-.btn-orange {
-    background-color: #FFA500; /* Orange vibrant */
-    border-color: #FFA500;
-    color: #ffffff; /* Texte blanc pour le contraste */
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-}
-
-.btn-orange:hover {
-    background-color: #e69500; /* Orange plus foncé au survol */
-    border-color: #e69500;
-    color: #ffffff;
-}
-
 /* Responsiveness supplémentaire pour très petits écrans */
 @media (max-width: 576px) {
     body {
@@ -281,7 +269,7 @@ footer {
     }
 
     .navbar-brand, .navbar-nav .nav-link {
-        font-size: 1rem;
+        font-size: 1.25rem;
     }
 
     .form-control {
@@ -290,8 +278,8 @@ footer {
     }
 
     .btn-primary, .btn-orange {
-        font-size: 0.875rem;
-        padding: 0.4rem 0.75rem;
+        font-size: 1rem;
+        padding: 0.5rem 1rem;
     }
 
     table {
