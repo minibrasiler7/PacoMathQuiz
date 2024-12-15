@@ -5,8 +5,24 @@
 <h4>Question :</h4>
 <p>{{ current_exercise.question }}</p>
 
-<!-- Ici, l'enseignant voit juste la question et l'élève courant -->
-<!-- Pas de formulaire, pas de timer -->
+<!-- Tableau des scores des élèves -->
+<h4>Scores des élèves :</h4>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Élève</th>
+            <th>Points</th>
+        </tr>
+    </thead>
+    <tbody id="scores-table-body">
+        {% for student in participants %}
+        <tr id="student-{{ student.id }}">
+            <td>{{ student.name }}</td>
+            <td>{{ scores.get(student.id, 0) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% endblock %}
 
 {% block scripts %}
@@ -20,21 +36,29 @@
 
     socket.on('competition_update', (data) => {
       console.log('Competition Update (Teacher View):', data);
-      // Ici, vous pouvez juste mettre à jour la question, l'élève courant, etc.
-      // Sans logique de timer ni de soumission de formulaire
+      // Mettre à jour la question
       if (data.current_exercise_question) {
         const questionElement = document.querySelector('p');
         questionElement.textContent = data.current_exercise_question;
       }
-      if (data.competition_ended) {
-      // Rediriger tous les clients (enseignant, élèves en attente, élèves éliminés)
-      // vers la page des résultats.
-         window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
-         return;
-        }
 
+      // Mettre à jour les scores
+      if (data.scores) {
+        for (const [student_id, score] of Object.entries(data.scores)) {
+          const scoreCell = document.querySelector(`#student-${student_id} td:nth-child(2)`);
+          if (scoreCell) {
+            scoreCell.textContent = score;
+          }
+        }
+      }
+
+      if (data.competition_ended) {
+        // Rediriger tous les clients (enseignant, élèves en attente, élèves éliminés)
+        // vers la page des résultats.
+        window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
+        return;
+      }
     });
   });
 </script>
 {% endblock %}
-

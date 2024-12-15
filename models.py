@@ -95,6 +95,8 @@ class Competition(db.Model):
     mode = db.Column(db.String(20), nullable=False)  # 'manuel' ou 'automatique'
     code = db.Column(db.Integer, nullable=True)  # Code pour le mode 'automatique'
     competition_started = db.Column(db.Boolean, default=False)
+    competition_ended = db.Column(db.Boolean, default=False)  # Nouveau champ
+
     current_exercise_id = db.Column(db.Integer, db.ForeignKey('exercise.id'), nullable=True)
 
     # Nouveaux champs

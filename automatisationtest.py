@@ -42,7 +42,7 @@ def main():
             teacher_page.wait_for_load_state("networkidle")
 
             # Vérifier qu'on est connecté : peut-être en checkant un élément sur la page d'accueil
-            teacher_page.wait_for_selector("text=Bienvenue sur PacoMathQuiz") # Titre présent dans home.html
+            teacher_page.wait_for_selector("text=Bienvenue sur PAQO") # Titre présent dans home.html
 
             # Aller à la page de création de compétition
             teacher_page.goto("http://127.0.0.1:5000/competition/new")

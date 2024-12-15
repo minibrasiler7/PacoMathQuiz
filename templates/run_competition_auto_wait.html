@@ -1,8 +1,12 @@
-{# run_competition_auto_wait.html #}
 {% extends "layout.html" %}
 {% block content %}
   <h2>Compétition : {{ competition.group.name }}</h2>
-  <p>En attente de votre tour, {{ student.name }} !</p>
+  <h3>En attente de votre tour, {{ student.name }} !</h3>
+
+  <!-- Affichage du score de l'élève connecté -->
+  <h4>Votre score :</h4>
+  <p id="student-score">{{ scores.get(student.id, 0) }}</p>
+
   <p>Patientez, la prochaine question arrive bientôt...</p>
 {% endblock %}
 
@@ -44,6 +48,12 @@
       } else {
         console.log("Ce n'est pas votre tour, on continue d'attendre");
       }
+
+      // Mettre à jour le score de l'élève connecté
+      if (data.scores && data.scores['{{ student.id }}'] !== undefined) {
+          const scoreElement = document.getElementById('student-score');
+          scoreElement.textContent = data.scores['{{ student.id }}'];
+      }
     });
 
     // Optionnel : Écouter les erreurs ou autres événements
@@ -53,3 +63,4 @@
   });
 </script>
 {% endblock %}
+

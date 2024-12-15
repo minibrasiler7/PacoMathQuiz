@@ -1,10 +1,13 @@
-{# run_competition_auto_current.html #}
 {% extends "layout.html" %}
 {% block content %}
 <h2>Compétition : {{ competition.group.name }}</h2>
 <h3>C'est votre tour, {{ student.name }} !</h3>
 <h4>Question :</h4>
 <p>{{ exercise.question }}</p>
+
+<!-- Affichage du score de l'élève connecté -->
+<h4>Votre score :</h4>
+<p id="student-score">{{ scores.get(student.id, 0) }}</p>
 
 <!-- Formulaire pour répondre à la question -->
 <form method="POST" id="answer-form">
@@ -43,38 +46,44 @@
 <script src="https://cdn.socket.io/4.5.1/socket.io.min.js" crossorigin="anonymous"></script>
 <script type="text/javascript">
   document.addEventListener("DOMContentLoaded", () => {
+    console.log("Timer script démarré");
     var socket = io();
+    console.log("Socket initialisé");
 
-    // Rejoindre une salle spécifique pour la compétition
-    socket.emit('join_competition', {'competition_id': {{ competition.id }}, 'student_id': {{ student_id }} });
+    socket.emit('join_competition', {'competition_id': "{{ competition.id }}", 'student_id': "{{ student_id }}" });
+    console.log("Événement join_competition émis");
 
-    // Gérer le compte à rebours
-    let timeRemaining = 10; // durée en secondes
+    let timeRemaining = 10;
     const timeDisplay = document.getElementById('time-remaining');
+    console.log("timeDisplay=", timeDisplay);
+
     const intervalId = setInterval(() => {
       timeRemaining--;
       timeDisplay.textContent = timeRemaining;
-
+      console.log("timeRemaining=", timeRemaining);
       if (timeRemaining <= 0) {
         clearInterval(intervalId);
-        // Soumettre automatiquement le formulaire
         document.getElementById('answer-form').submit();
       }
     }, 1000);
 
-    // Écouter l'événement 'competition_update' pour ajuster le compte à rebours si nécessaire
     socket.on('competition_update', (data) => {
       if (!data.competition_started) {
         console.log("La compétition n'a pas encore commencé.");
-        // Optionnel : Réinitialiser le compte à rebours ou afficher un message
+      }
+
+      // Mettre à jour le score de l'élève connecté
+      if (data.scores && data.scores['{{ student.id }}'] !== undefined) {
+          const scoreElement = document.getElementById('student-score');
+          scoreElement.textContent = data.scores['{{ student.id }}'];
+      }
+
+      if (data.competition_ended) {
+        window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
+        return;
       }
     });
 
-    // Optionnel : Écouter des événements spécifiques
-    socket.on('time_extended', (data) => {
-      timeRemaining += data.additional_time;
-      console.log(`Temps additionnel ajouté: ${data.additional_time} secondes`);
-    });
   });
 </script>
 {% endblock %}
