@@ -12,7 +12,7 @@ from flask_bcrypt import Bcrypt
 
 load_dotenv()
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key')
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 # Remplacer 'postgres://' par 'postgresql://' si nécessaire
