@@ -3,16 +3,18 @@ from datetime import datetime
 import os
 from flask import Flask
 from dotenv import load_dotenv
-from extensions import db, login_manager
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from extensions import login_manager
+from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
+from models import db, User, Competition, Class, Exercise, ExerciseGroup
 
 
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))
+# Récupérer l'URL de la base de données
 DATABASE_URL = os.getenv('DATABASE_URL')
 
 # Remplacer 'postgres://' par 'postgresql://' si nécessaire
@@ -37,8 +39,8 @@ def inject_current_year():
 from routes import *
 
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
+    #with app.app_context():
+        #db.create_all()
     # Utilisez socketio.run au lieu de app.run si vous souhaitez tester les WebSockets localement
     socketio.run(app, debug=True)
 
