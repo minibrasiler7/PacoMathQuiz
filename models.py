@@ -19,6 +19,8 @@ class User(db.Model, UserMixin):
     exercises = db.relationship('Exercise', backref='teacher', lazy=True)
     exercise_groups = db.relationship('ExerciseGroup', backref='teacher', lazy=True)
 
+
+
     def __repr__(self):
         return f"User('{self.username}', '{self.email}')"
 

@@ -6,13 +6,14 @@ from dotenv import load_dotenv
 from extensions import db, login_manager
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_migrate import Migrate
+from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 
 
 load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///local.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialiser les extensions
