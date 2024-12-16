@@ -23,7 +23,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL or 'sqlite:///local.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialiser les extensions
-db.init_app(app)
+db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 socketio = SocketIO(app, async_mode='eventlet')
 login_manager.init_app(app)
