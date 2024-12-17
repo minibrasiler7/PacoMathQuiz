@@ -79,7 +79,7 @@
       }
 
       if (data.competition_ended) {
-        window.location.href = "{{ url_for('competition_results', competition_id=competition.id) }}";
+        window.location.href = "{{ url_for('auth.competition_results', competition_id=competition.id) }}";
         return;
       }
     });

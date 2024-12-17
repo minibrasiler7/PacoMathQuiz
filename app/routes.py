@@ -1,25 +1,27 @@
 # routes.py
-import json
-from flask import render_template, url_for, flash, redirect, request, abort, jsonify, session
+from flask import Blueprint, render_template, url_for, flash, redirect, request, abort, jsonify, session
 from flask_login import login_user, current_user, logout_user, login_required
 from flask_socketio import join_room, emit
-from app import app, db, bcrypt, socketio
-from forms import (RegistrationForm, LoginForm, ExerciseGroupForm, CompetitionForm, EmptyForm,
+from .extensions import db, bcrypt, socketio
+from .models import User, Exercise, Choice, Class, Student, ExerciseGroup, Competition, CompetitionStudentStat
+from .forms import (RegistrationForm, LoginForm, ExerciseGroupForm, CompetitionForm, EmptyForm,
                    AssignExercisesForm, ValidateParticipantsForm, CompetitionCodeForm, ClassForm,
                    StudentForm, ExerciseForm, MultiStudentForm, StartCompetitionForm)
-from models import User, Exercise, Choice, Class, Student, ExerciseGroup, Competition, CompetitionStudentStat
 import random
 from random import randint
+import json
 
-@app.route("/")
-@app.route("/home")
+auth = Blueprint('auth', __name__)
+main = Blueprint('main', __name__)
+@main.route("/")
+@main.route("/home")
 def home():
     return render_template('home.html', title='Accueil')
 
-@app.route("/register", methods=['GET', 'POST'])
+@auth.route("/register", methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
@@ -27,13 +29,13 @@ def register():
         db.session.add(user)
         db.session.commit()
         flash('Votre compte a été créé avec succès ! Vous pouvez maintenant vous connecter.', 'success')
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     return render_template('register.html', title='Inscription', form=form)
 
-@app.route("/login", methods=['GET', 'POST'])
+@auth.route("/login", methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(email=form.email.data).first()
@@ -41,24 +43,24 @@ def login():
             login_user(user, remember=form.remember.data)
             next_page = request.args.get('next')
             flash('Vous êtes maintenant connecté.', 'success')
-            return redirect(next_page) if next_page else redirect(url_for('home'))
+            return redirect(next_page) if next_page else redirect(url_for('main.home'))
         else:
             flash('Échec de la connexion. Veuillez vérifier votre email et mot de passe.', 'danger')
     return render_template('login.html', title='Connexion', form=form)
 
-@app.route("/logout")
+@auth.route("/logout")
 def logout():
     logout_user()
     flash('Vous avez été déconnecté.', 'info')
-    return redirect(url_for('home'))
+    return redirect(url_for('main.home'))
 
-@app.route("/classes")
+@auth.route("/classes")
 @login_required
 def classes():
     classes = Class.query.filter_by(teacher_id=current_user.id).all()
     return render_template('classes.html', classes=classes)
 
-@app.route("/class/new", methods=['GET', 'POST'])
+@auth.route("/class/new", methods=['GET', 'POST'])
 @login_required
 def new_class():
     form = ClassForm()
@@ -67,10 +69,10 @@ def new_class():
         db.session.add(new_class)
         db.session.commit()
         flash('La classe a été créée avec succès.', 'success')
-        return redirect(url_for('classes'))
+        return redirect(url_for('auth.classes'))
     return render_template('create_class.html', title='Nouvelle Classe', form=form)
 
-@app.route("/class/<int:class_id>")
+@auth.route("/class/<int:class_id>")
 @login_required
 def class_detail(class_id):
     class_instance = Class.query.get_or_404(class_id)
@@ -79,7 +81,7 @@ def class_detail(class_id):
     students = Student.query.filter_by(class_id=class_instance.id).all()
     return render_template('class_detail.html', class_instance=class_instance, students=students)
 
-@app.route("/class/<int:class_id>/update", methods=['GET', 'POST'])
+@auth.route("/class/<int:class_id>/update", methods=['GET', 'POST'])
 @login_required
 def update_class(class_id):
     class_instance = Class.query.get_or_404(class_id)
@@ -90,12 +92,12 @@ def update_class(class_id):
         class_instance.name = form.name.data
         db.session.commit()
         flash('La classe a été mise à jour.', 'success')
-        return redirect(url_for('classes'))
+        return redirect(url_for('auth.classes'))
     elif request.method == 'GET':
         form.name.data = class_instance.name
     return render_template('create_class.html', title='Modifier la Classe', form=form)
 
-@app.route("/class/<int:class_id>/delete", methods=['POST'])
+@auth.route("/class/<int:class_id>/delete", methods=['POST'])
 @login_required
 def delete_class(class_id):
     class_instance = Class.query.get_or_404(class_id)
@@ -104,9 +106,9 @@ def delete_class(class_id):
     db.session.delete(class_instance)
     db.session.commit()
     flash('La classe a été supprimée.', 'success')
-    return redirect(url_for('classes'))
+    return redirect(url_for('auth.classes'))
 
-@app.route("/class/<int:class_id>/student/new", methods=['GET', 'POST'])
+@auth.route("/class/<int:class_id>/student/new", methods=['GET', 'POST'])
 @login_required
 def new_students(class_id):
     class_instance = Class.query.get_or_404(class_id)
@@ -121,10 +123,10 @@ def new_students(class_id):
                 db.session.add(student)
         db.session.commit()
         flash('Les élèves ont été ajoutés avec succès.', 'success')
-        return redirect(url_for('class_detail', class_id=class_id))
+        return redirect(url_for('auth.class_detail', class_id=class_id))
     return render_template('create_student.html', title='Nouvel Élève', form=form, class_instance=class_instance)
 
-@app.route("/student/<int:student_id>/delete", methods=['POST'])
+@auth.route("/student/<int:student_id>/delete", methods=['POST'])
 @login_required
 def delete_student(student_id):
     student = Student.query.get_or_404(student_id)
@@ -134,15 +136,15 @@ def delete_student(student_id):
     db.session.delete(student)
     db.session.commit()
     flash('L\'élève a été supprimé.', 'success')
-    return redirect(url_for('class_detail', class_id=class_instance.id))
+    return redirect(url_for('auth.class_detail', class_id=class_instance.id))
 
-@app.route("/exercises")
+@auth.route("/exercises")
 @login_required
 def exercises():
     exercises = Exercise.query.filter_by(teacher_id=current_user.id).all()
     return render_template('exercises.html', exercises=exercises)
 
-@app.route("/exercise/new", methods=['GET', 'POST'])
+@auth.route("/exercise/new", methods=['GET', 'POST'])
 @login_required
 def new_exercise():
     form = ExerciseForm()
@@ -172,12 +174,12 @@ def new_exercise():
         db.session.add(exercise)
         db.session.commit()
         flash('L\'exercice a été créé avec succès.', 'success')
-        return redirect(url_for('exercises'))
+        return redirect(url_for('auth.exercises'))
     else:
         print(form.errors)
     return render_template('create_exercise.html', title='Nouvel Exercice', form=form)
 
-@app.route("/exercise/<int:exercise_id>")
+@auth.route("/exercise/<int:exercise_id>")
 @login_required
 def exercise_detail(exercise_id):
     exercise = Exercise.query.get_or_404(exercise_id)
@@ -185,7 +187,7 @@ def exercise_detail(exercise_id):
         abort(403)
     return render_template('exercise_detail.html', exercise=exercise)
 
-@app.route("/exercise/<int:exercise_id>/update", methods=['GET', 'POST'])
+@auth.route("/exercise/<int:exercise_id>/update", methods=['GET', 'POST'])
 @login_required
 def update_exercise(exercise_id):
     exercise = Exercise.query.get_or_404(exercise_id)
@@ -207,7 +209,7 @@ def update_exercise(exercise_id):
             Choice.query.filter_by(exercise_id=exercise.id).delete()
         db.session.commit()
         flash('L\'exercice a été mis à jour.', 'success')
-        return redirect(url_for('exercises'))
+        return redirect(url_for('auth.exercises'))
     elif request.method == 'GET':
         form.title.data = exercise.title
         form.question.data = exercise.question
@@ -224,7 +226,7 @@ def update_exercise(exercise_id):
             form.correct_answer.data = exercise.correct_answer
     return render_template('create_exercise.html', title='Modifier l\'Exercice', form=form)
 
-@app.route("/exercise/<int:exercise_id>/delete", methods=['POST'])
+@auth.route("/exercise/<int:exercise_id>/delete", methods=['POST'])
 @login_required
 def delete_exercise(exercise_id):
     exercise = Exercise.query.get_or_404(exercise_id)
@@ -233,16 +235,16 @@ def delete_exercise(exercise_id):
     db.session.delete(exercise)
     db.session.commit()
     flash('L\'exercice a été supprimé.', 'success')
-    return redirect(url_for('exercises'))
+    return redirect(url_for('auth.exercises'))
 
-@app.route("/exercise_groups")
+@auth.route("/exercise_groups")
 @login_required
 def exercise_groups():
     groups = ExerciseGroup.query.filter_by(teacher_id=current_user.id).all()
     form = EmptyForm()
     return render_template('exercise_groups.html', groups=groups, form=form)
 
-@app.route("/exercise_group/new", methods=['GET', 'POST'])
+@auth.route("/exercise_group/new", methods=['GET', 'POST'])
 @login_required
 def new_exercise_group():
     form = ExerciseGroupForm()
@@ -251,10 +253,10 @@ def new_exercise_group():
         db.session.add(group)
         db.session.commit()
         flash('Le groupe d\'exercices a été créé avec succès.', 'success')
-        return redirect(url_for('exercise_groups'))
+        return redirect(url_for('auth.exercise_groups'))
     return render_template('create_exercise_group.html', title='Nouveau Groupe d\'Exercices', form=form)
 
-@app.route("/exercise_group/<int:group_id>")
+@auth.route("/exercise_group/<int:group_id>")
 @login_required
 def exercise_group_detail(group_id):
     group = ExerciseGroup.query.get_or_404(group_id)
@@ -262,7 +264,7 @@ def exercise_group_detail(group_id):
         abort(403)
     return render_template('exercise_group_detail.html', group=group)
 
-@app.route("/exercise_group/<int:group_id>/update", methods=['GET', 'POST'])
+@auth.route("/exercise_group/<int:group_id>/update", methods=['GET', 'POST'])
 @login_required
 def update_exercise_group(group_id):
     group = ExerciseGroup.query.get_or_404(group_id)
@@ -273,12 +275,12 @@ def update_exercise_group(group_id):
         group.name = form.name.data
         db.session.commit()
         flash('Le groupe d\'exercices a été mis à jour.', 'success')
-        return redirect(url_for('exercise_group_detail', group_id=group.id))
+        return redirect(url_for('auth.exercise_group_detail', group_id=group.id))
     elif request.method == 'GET':
         form.name.data = group.name
     return render_template('create_exercise_group.html', title='Modifier le Groupe d\'Exercices', form=form)
 
-@app.route("/exercise_group/<int:group_id>/delete", methods=['POST'])
+@auth.route("/exercise_group/<int:group_id>/delete", methods=['POST'])
 @login_required
 def delete_exercise_group(group_id):
     group = ExerciseGroup.query.get_or_404(group_id)
@@ -287,9 +289,9 @@ def delete_exercise_group(group_id):
     db.session.delete(group)
     db.session.commit()
     flash('Le groupe d\'exercices a été supprimé.', 'success')
-    return redirect(url_for('exercise_groups'))
+    return redirect(url_for('auth.exercise_groups'))
 
-@app.route("/exercise_group/<int:group_id>/assign_exercises", methods=['GET', 'POST'])
+@auth.route("/exercise_group/<int:group_id>/assign_exercises", methods=['GET', 'POST'])
 @login_required
 def assign_exercises_to_group(group_id):
     group = ExerciseGroup.query.get_or_404(group_id)
@@ -301,12 +303,12 @@ def assign_exercises_to_group(group_id):
         group.exercises = Exercise.query.filter(Exercise.id.in_(selected_exercises)).all()
         db.session.commit()
         flash('Les exercices ont été assignés au groupe.', 'success')
-        return redirect(url_for('exercise_group_detail', group_id=group_id))
+        return redirect(url_for('auth.exercise_group_detail', group_id=group_id))
     else:
         exercises = Exercise.query.filter_by(teacher_id=current_user.id).all()
         return render_template('assign_exercises_to_group.html', group=group, exercises=exercises, form=form)
 
-@app.route("/competition/new", methods=['GET', 'POST'])
+@auth.route("/competition/new", methods=['GET', 'POST'])
 @login_required
 def new_competition():
     form = CompetitionForm()
@@ -331,10 +333,10 @@ def new_competition():
         db.session.add(competition)
         db.session.commit()
         flash('La compétition a été démarrée avec succès.', 'success')
-        return redirect(url_for('competition_detail', competition_id=competition.id))
+        return redirect(url_for('auth.competition_detail', competition_id=competition.id))
     return render_template('new_competition.html', form=form)
 
-@app.route("/competition/<int:competition_id>", methods=['GET', 'POST'])
+@auth.route("/competition/<int:competition_id>", methods=['GET', 'POST'])
 @login_required
 def competition_detail(competition_id):
     competition = Competition.query.get_or_404(competition_id)
@@ -352,19 +354,19 @@ def competition_detail(competition_id):
             print("DEBUG: competition.participants =", [s.name for s in competition.participants])
             db.session.commit()
             flash('Les élèves présents ont été enregistrés.', 'success')
-            return redirect(url_for('start_competition', competition_id=competition.id))
+            return redirect(url_for('auth.start_competition', competition_id=competition.id))
         return render_template('competition_detail.html', competition=competition, students=students, form=form)
     else:
         form = StartCompetitionForm()
         if form.validate_on_submit():
             if competition.participants:
                 flash('La compétition est prête à démarrer.', 'success')
-                return redirect(url_for('start_competition', competition_id=competition.id))
+                return redirect(url_for('auth.start_competition', competition_id=competition.id))
             else:
                 flash('Aucun élève n\'a rejoint la compétition.', 'warning')
         return render_template('competition_detail.html', competition=competition, students=students, form=form)
 
-@app.route("/competition/<int:competition_id>/start", methods=['POST', 'GET'])
+@auth.route("/competition/<int:competition_id>/start", methods=['POST', 'GET'])
 @login_required
 def start_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
@@ -396,7 +398,7 @@ def start_competition(competition_id):
             else:
                 # Aucun exercice disponible dans le groupe
                 flash('Aucun exercice disponible dans le groupe.', 'danger')
-                return redirect(url_for('competition_results', competition_id=competition.id))
+                return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
         # Sélectionner un exercice aléatoire
         exercise = random.choice(available_exercises)
@@ -411,29 +413,29 @@ def start_competition(competition_id):
         update_competition(competition.id)
 
     if competition.mode == 'automatique':
-        return redirect(url_for('teacher_view_competition', competition_id=competition.id))
+        return redirect(url_for('auth.teacher_view_competition', competition_id=competition.id))
     else:
-        return redirect(url_for('run_competition', competition_id=competition.id))
+        return redirect(url_for('auth.run_competition', competition_id=competition.id))
 
 
-@app.route("/competition/join", methods=['GET', 'POST'])
+@auth.route("/competition/join", methods=['GET', 'POST'])
 def join_competition():
     form = CompetitionCodeForm()
     if form.validate_on_submit():
         code = form.code.data
         competition = Competition.query.filter_by(code=code).first()
         if competition:
-            return redirect(url_for('select_student', competition_id=competition.id))
+            return redirect(url_for('auth.select_student', competition_id=competition.id))
         else:
             flash('Code de compétition invalide.', 'danger')
     return render_template('join_competition.html', form=form)
 
-@app.route("/competition/<int:competition_id>/select_student", methods=['GET', 'POST'])
+@auth.route("/competition/<int:competition_id>/select_student", methods=['GET', 'POST'])
 def select_student(competition_id):
     competition = Competition.query.get_or_404(competition_id)
     if competition.mode != 'automatique':
         flash('Cette compétition n\'est pas en mode automatique.', 'danger')
-        return redirect(url_for('join_competition'))
+        return redirect(url_for('auth.join_competition'))
 
     classe = competition.class_
     students = classe.students
@@ -450,13 +452,13 @@ def select_student(competition_id):
                 flash(f'Vous avez rejoint la compétition. Participants actuels : {[s.name for s in competition.participants]}', 'success')
 
             session['student_id'] = student.id
-            return redirect(url_for('competition_wait', competition_id=competition.id, student_id=student.id))
+            return redirect(url_for('auth.competition_wait', competition_id=competition.id, student_id=student.id))
         else:
             flash('Sélection invalide.', 'danger')
 
     return render_template('select_student.html', competition=competition, students=students)
 
-@app.route("/competition/<int:competition_id>/wait/<int:student_id>")
+@auth.route("/competition/<int:competition_id>/wait/<int:student_id>")
 def competition_wait(competition_id, student_id):
     competition = Competition.query.get_or_404(competition_id)
     student = Student.query.get_or_404(student_id)
@@ -494,13 +496,13 @@ def get_or_create_stat(competition_id, student_id):
         db.session.add(stat)
         db.session.commit()
     return stat
-@app.route("/competition/<int:competition_id>/run", methods=['GET', 'POST'])
+@auth.route("/competition/<int:competition_id>/run", methods=['GET', 'POST'])
 def run_competition(competition_id):
     print("DEBUG: run_competition appelée avec competition_id =", competition_id)
     competition = Competition.query.get_or_404(competition_id)
     if competition.competition_ended:
         flash('La compétition est déjà terminée.', 'info')
-        return redirect(url_for('competition_results', competition_id=competition.id))
+        return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
     participants = competition.participants  # Liste des participants
     print("DEBUG: Participants =", [p.name for p in participants])
@@ -535,7 +537,7 @@ def run_competition(competition_id):
         if dom:
             print("DEBUG: Dominant => fin de la compétition")
             update_competition(competition.id, competition_ended=True)
-            return redirect(url_for('competition_results', competition_id=competition.id))
+            return redirect(url_for('auth.competition_results', competition_id=competition.id))
         else:
             # Pas dominant
             if competition.last_player_chances == 2:
@@ -546,7 +548,7 @@ def run_competition(competition_id):
             else:
                 print("DEBUG: Aucune chance restante, fin de la compétition")
                 update_competition(competition.id, competition_ended=True)
-                return redirect(url_for('competition_results', competition_id=competition.id))
+                return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
     print("DEBUG: Chargement des élèves actifs")
     try:
@@ -555,19 +557,19 @@ def run_competition(competition_id):
     except Exception as e:
         print("DEBUG: Exception lors du chargement des élèves actifs:", e)
         flash('Erreur de chargement des données de la compétition.', 'danger')
-        return redirect(url_for('competition_detail', competition_id=competition.id))
+        return redirect(url_for('auth.competition_detail', competition_id=competition.id))
 
     if not active_student_ids:
         print("DEBUG: Aucun élève actif")
         if not participants:
             print("DEBUG: Aucun participant inscrit")
             flash("La compétition n'a pas encore démarré ou aucun élève actif.", 'warning')
-            return redirect(url_for('competition_detail', competition_id=competition.id))
+            return redirect(url_for('auth.competition_detail', competition_id=competition.id))
         else:
             print("DEBUG: Tous les élèves ont été éliminés")
             flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
             update_competition(competition.id, competition_ended=True)
-            return redirect(url_for('competition_results', competition_id=competition.id))
+            return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
     # Charger les exercices utilisés
     print("DEBUG: Chargement des exercices utilisés")
@@ -577,7 +579,7 @@ def run_competition(competition_id):
     except json.JSONDecodeError as e:
         print("DEBUG: JSONDecodeError pour used_exercise_ids:", e)
         flash('Erreur de chargement des données des exercices utilisés.', 'danger')
-        return redirect(url_for('competition_detail', competition_id=competition.id))
+        return redirect(url_for('auth.competition_detail', competition_id=competition.id))
 
     print("DEBUG: Ajustement de l'index courant")
     current_index = competition.current_student_index
@@ -608,12 +610,12 @@ def run_competition(competition_id):
                 print("DEBUG: Toujours aucun exercice")
                 flash('Aucune question disponible.', 'danger')
                 update_competition(competition.id, competition_ended=True)
-                return redirect(url_for('competition_results', competition_id=competition.id))
+                return redirect(url_for('auth.competition_results', competition_id=competition.id))
         else:
             print("DEBUG: Aucun exercice du tout dans le groupe")
             flash('Aucune question disponible.', 'danger')
             update_competition(competition.id, competition_ended=True)
-            return redirect(url_for('competition_results', competition_id=competition.id))
+            return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
     exercise = random.choice(available_exercises)
     print("DEBUG: Exercice sélectionné:", exercise.title)
@@ -654,12 +656,12 @@ def run_competition(competition_id):
                 if not active_student_ids:
                     print("DEBUG: Tous éliminés en mode manuel")
                     update_competition(competition.id, competition_ended=True)
-                    return redirect(url_for('competition_results', competition_id=competition.id))
+                    return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
             else:
                 print("DEBUG: Résultat invalide en mode manuel")
                 flash('Résultat invalide.', 'danger')
-                return redirect(url_for('run_competition', competition_id=competition.id))
+                return redirect(url_for('auth.run_competition', competition_id=competition.id))
 
             if result == 'correct' and len(active_student_ids) > 1:
                 print("DEBUG: Plusieurs élèves, on passe au suivant en mode manuel")
@@ -668,7 +670,7 @@ def run_competition(competition_id):
                 db.session.commit()
                 update_competition(competition.id)
 
-            return redirect(url_for('run_competition', competition_id=competition.id))
+            return redirect(url_for('auth.run_competition', competition_id=competition.id))
 
         print("DEBUG: Affichage template manuel")
         active_students = Student.query.filter(Student.id.in_(active_student_ids)).all()
@@ -688,7 +690,7 @@ def run_competition(competition_id):
         if not visitor_student_id:
             print("DEBUG: Aucun visitor_student_id, redirection join_competition")
             flash('Vous devez rejoindre la compétition d\'abord.', 'danger')
-            return redirect(url_for('join_competition'))
+            return redirect(url_for('auth.join_competition'))
 
         visitor_student = Student.query.get(visitor_student_id)
         print("DEBUG: visitor_student =", visitor_student.name if visitor_student else None)
@@ -731,11 +733,11 @@ def run_competition(competition_id):
                     if not active_student_ids:
                         print("DEBUG: Tous éliminés en mode automatique")
                         update_competition(competition.id, competition_ended=True)
-                        return redirect(url_for('competition_results', competition_id=competition.id))
+                        return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
                 update_competition(competition.id)
                 print("DEBUG: Redirection competition_wait après une réponse en mode auto")
-                return redirect(url_for('competition_wait', competition_id=competition.id, student_id=visitor_student.id))
+                return redirect(url_for('auth.competition_wait', competition_id=competition.id, student_id=visitor_student.id))
 
             print("DEBUG: GET en mode automatique, affichage template run_competition_auto_current")
             return render_template('run_competition_auto_current.html',
@@ -752,7 +754,7 @@ def run_competition(competition_id):
                                    student_id=visitor_student.id,
                                    scores= scores)
 
-@app.route("/competition/<int:competition_id>/run_current/<int:student_id>", methods=['GET', 'POST'])
+@auth.route("/competition/<int:competition_id>/run_current/<int:student_id>", methods=['GET', 'POST'])
 def run_competition_auto_current(competition_id, student_id):
     competition = Competition.query.get_or_404(competition_id)
     student = Student.query.get_or_404(student_id)
@@ -760,19 +762,19 @@ def run_competition_auto_current(competition_id, student_id):
     # Vérification que le user est un élève participant
     if student not in competition.participants:
         flash('Vous n\'êtes pas inscrit à cette compétition.', 'danger')
-        return redirect(url_for('join_competition'))
+        return redirect(url_for('auth.join_competition'))
 
     # Vérification du visitor_student_id depuis la session
     visitor_student_id = session.get('student_id')
     print(f"Visitor student id : {visitor_student_id} et student_id:  {student_id} competition_id {competition}")
     if visitor_student_id is None or visitor_student_id != student_id:
         flash('Vous ne pouvez pas répondre en tant que cet élève.', 'danger')
-        return redirect(url_for('competition_wait', competition_id=competition_id, student_id=student_id))
+        return redirect(url_for('auth.competition_wait', competition_id=competition_id, student_id=student_id))
 
     current_student_id = competition.get_current_student_id()
     if str(current_student_id) != str(student_id):
         flash('Ce n\'est pas votre tour.', 'warning')
-        return redirect(url_for('competition_wait', competition_id=competition_id, student_id=student_id))
+        return redirect(url_for('auth.competition_wait', competition_id=competition_id, student_id=student_id))
 
     # Récupérer l'exercice actuel
     current_exercise = Exercise.query.get(competition.current_exercise_id)
@@ -803,7 +805,7 @@ def run_competition_auto_current(competition_id, student_id):
                 flash('Tous les élèves ont été éliminés. La compétition est terminée.', 'info')
                 db.session.commit()
                 update_competition(competition.id)
-                return redirect(url_for('competition_results', competition_id=competition.id))
+                return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
             # Mettre à jour l'index pour le prochain élève
             competition.current_student_index = competition.current_student_index % len(active_student_ids)
@@ -811,7 +813,7 @@ def run_competition_auto_current(competition_id, student_id):
         db.session.commit()
         # Émettre une mise à jour de la compétition
         update_competition(competition.id)
-        return redirect(url_for('run_competition', competition_id=competition.id))
+        return redirect(url_for('auth.run_competition', competition_id=competition.id))
 
     stats = CompetitionStudentStat.query.filter_by(competition_id=competition.id).all()
     scores = {stat.student_id: stat.correct_answers for stat in stats}
@@ -823,7 +825,7 @@ def run_competition_auto_current(competition_id, student_id):
                            scores=scores)
 
 
-@app.route("/competition/<int:competition_id>/results")
+@auth.route("/competition/<int:competition_id>/results")
 def competition_results(competition_id):
     competition = Competition.query.get_or_404(competition_id)
     active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
@@ -844,7 +846,7 @@ def competition_results(competition_id):
                            eliminated_students=eliminated_students,
                            stats_dict=stats_dict)
 
-@app.route("/competition/<int:competition_id>/status")
+@auth.route("/competition/<int:competition_id>/status")
 def competition_status(competition_id):
     competition = Competition.query.get_or_404(competition_id)
     active_students_list = json.loads(competition.active_student_ids) if competition.active_student_ids else []
@@ -861,7 +863,7 @@ def competition_status(competition_id):
     }
     return jsonify(data)
 
-@app.route("/competition/<int:competition_id>/teacher_view")
+@auth.route("/competition/<int:competition_id>/teacher_view")
 @login_required
 def teacher_view_competition(competition_id):
     competition = Competition.query.get_or_404(competition_id)
@@ -871,7 +873,7 @@ def teacher_view_competition(competition_id):
     active_student_ids = json.loads(competition.active_student_ids) if competition.active_student_ids else []
 
     if not active_student_ids:
-        return redirect(url_for('competition_results', competition_id=competition.id))
+        return redirect(url_for('auth.competition_results', competition_id=competition.id))
 
     current_index = competition.current_student_index
     if current_index >= len(active_student_ids):

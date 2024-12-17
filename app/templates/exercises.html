@@ -1,0 +1,23 @@
+{# exercises.html #}
+{% extends "layout.html" %}
+{% block content %}
+  <h2>Vos Exercices</h2>
+  <a href="{{ url_for('auth.new_exercise') }}" class="btn btn-primary mb-3">Créer un Nouvel Exercice</a>
+  {% if exercises %}
+    <ul class="list-group">
+      {% for exercise in exercises %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <a href="{{ url_for('auth.exercise_detail', exercise_id=exercise.id) }}">{{ exercise.title }}</a>
+          <div>
+            <a href="{{ url_for('auth.update_exercise', exercise_id=exercise.id) }}" class="btn btn-secondary btn-sm">Modifier</a>
+            <form action="{{ url_for('auth.delete_exercise', exercise_id=exercise.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cet exercice ?');">
+              <button type="submit" class="btn btn-danger btn-sm">Supprimer</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>Vous n'avez pas encore créé d'exercices.</p>
+  {% endif %}
+{% endblock %}

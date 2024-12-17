@@ -1,2 +1,3 @@
 release: flask db upgrade
-web: gunicorn app:app --worker-class eventlet -w 1
+web: gunicorn run:app -k eventlet --log-file -
+

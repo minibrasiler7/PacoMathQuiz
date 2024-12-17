@@ -2,7 +2,7 @@
 from flask_wtf import FlaskForm
 from wtforms import Form, StringField, PasswordField, SubmitField, BooleanField, TextAreaField, SelectField, FieldList, FormField, IntegerField, RadioField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
-from models import User
+from .models import User
 
 class ConditionalRadioField(RadioField):
     def pre_validate(self, form):
